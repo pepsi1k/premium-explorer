@@ -1,0 +1,1432 @@
+{
+  "name": "premium-explorer",
+  "publisher": "pepsik",
+  "icon": "images/logo-512.png",
+  "displayName": "Premium Explorer",
+  "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
+  "version": "1.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pepsi1k/premium-explorer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pepsi1k/premium-explorer/issues"
+  },
+  "homepage": "https://github.com/pepsi1k/premium-explorer#readme",
+  "keywords": [
+    "git",
+    "explorer",
+    "folder",
+    "color",
+    "background",
+    "decoration",
+    "file-decoration"
+  ],
+  "engines": {
+    "vscode": "^1.133.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "premium-explorer.refresh",
+        "title": "Premium Explorer: Refresh Decorations"
+      },
+      {
+        "command": "premium-explorer.generateBackgroundCss",
+        "title": "Premium Explorer: Generate Background CSS (vscode-custom-css)"
+      }
+    ],
+    "configuration": {
+      "title": "Premium Explorer",
+      "properties": {
+        "premiumExplorer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Color folders that contain a Git repository."
+        },
+        "premiumExplorer.rules": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Path-scoped coloring rules, evaluated by path specificity (a deeper rule wins). With no rules, nothing is colored.\n\n- `git`: every Git repository under `path` is colored automatically, each from `premiumExplorer.palette`.\n- `manual` (used when `engine` is omitted): the folder at `path` **and everything inside it** is styled by this rule's layer settings, over a base of `premiumExplorer.defaultColor`.\n\nEach folder is painted with independent layers — **background**, **edge** bar, **pill**, **text** and **watermark** watermark — set globally via `premiumExplorer.root*`/`premiumExplorer.inner*` and overridable per rule with the same `root*`/`inner*` keys (a `*Color` left empty falls back to the folder base).\n\nPaths may be workspace-relative (`.`, `./projects`) or absolute.\n\n```jsonc\n\"premiumExplorer.rules\": [\n  { \"path\": \".\", \"engine\": \"git\" },\n  { \"path\": \"./notes\", \"rootBackgroundColor\": \"#00b8ff\", \"rootPill\": \"solid\",\n    \"rootTextStyle\": \"bold\", \"innerBackgroundStyle\": \"none\" },\n  { \"path\": \"./scratch\" }\n]\n```",
+          "items": {
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Folder path: workspace-relative (\".\", \"./projects\") or absolute."
+              },
+              "engine": {
+                "type": "string",
+                "enum": [
+                  "git",
+                  "manual"
+                ],
+                "enumDescriptions": [
+                  "Auto-color every Git repository found under this path, each from `premiumExplorer.palette`.",
+                  "Style this folder and everything inside it with the layer settings on this rule."
+                ],
+                "default": "manual",
+                "markdownDescription": "How this path is colored. Defaults to `manual` if omitted. (`default` is still accepted as an old name for `manual`.)"
+              },
+              "rootBackgroundStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No full-row fill — bare VS Code styling.",
+                  "Fill the whole row with the background color.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Background** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "rootBackgroundColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "rootBackgroundOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the background fill for the repo root row."
+              },
+              "rootEdge": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No edge bar — bare VS Code styling.",
+                  "Draw a colored bar on the left edge of the row.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Edge** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "rootEdgeColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "rootEdgeOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the edge bar for the repo root row."
+              },
+              "rootPill": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No pill — bare VS Code styling.",
+                  "Draw a rounded background behind just the label text.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Pill** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "rootPillColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "rootPillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the pill for the repo root row."
+              },
+              "rootPillRadius": {
+                "type": "number",
+                "minimum": 0,
+                "markdownDescription": "Corner radius (px) of the pill for the repo root row."
+              },
+              "rootTextStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "bold",
+                  "italic",
+                  "bold-italic"
+                ],
+                "markdownDescription": "**Text** weight/style for the repo root row's label.",
+                "enumDescriptions": [
+                  "No weight/style change — the theme decides.",
+                  "Bold label.",
+                  "Italic label.",
+                  "Bold + italic label."
+                ]
+              },
+              "rootTextColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Label text color for the repo root row. Empty = leave it to the theme."
+              },
+              "innerBackgroundStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No full-row fill — bare VS Code styling.",
+                  "Fill the whole row with the background color.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Background** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "innerBackgroundColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "innerBackgroundOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the background fill for the inner rows (files/folders inside)."
+              },
+              "innerEdge": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No edge bar — bare VS Code styling.",
+                  "Draw a colored bar on the left edge of the row.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Edge** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "innerEdgeColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "innerEdgeOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the edge bar for the inner rows (files/folders inside)."
+              },
+              "innerPill": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No pill — bare VS Code styling.",
+                  "Draw a rounded background behind just the label text.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+                ],
+                "markdownDescription": "**Pill** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+              },
+              "innerPillColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+              },
+              "innerPillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the pill for the inner rows (files/folders inside)."
+              },
+              "innerPillRadius": {
+                "type": "number",
+                "minimum": 0,
+                "markdownDescription": "Corner radius (px) of the pill for the inner rows (files/folders inside)."
+              },
+              "innerTextStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "bold",
+                  "italic",
+                  "bold-italic"
+                ],
+                "markdownDescription": "**Text** weight/style for the inner rows (files/folders inside)'s label.",
+                "enumDescriptions": [
+                  "No weight/style change — the theme decides.",
+                  "Bold label.",
+                  "Italic label.",
+                  "Bold + italic label."
+                ]
+              },
+              "innerTextColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Label text color for the inner rows (files/folders inside). Empty = leave it to the theme."
+              },
+              "rootEdgeColors": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ]
+                },
+                "markdownDescription": "Explicit colour **sequence** for the repo root row's edge bar, drawn as 45° stripes. Empty = auto-derived from the folder's hash (see `#premiumExplorer.edgeColorCount#`)."
+              },
+              "rootEdgeWidth": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Width in px of the repo root row's edge bar."
+              },
+              "rootEdgeStripeSize": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Thickness in px of one diagonal stripe band on the repo root row's edge bar."
+              },
+              "rootWatermarkStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No watermark — bare VS Code styling.",
+                  "Scatter the folder's watermark faintly behind the row.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
+                ],
+                "markdownDescription": "**Watermark** layer for the repo root row: artwork scattered faintly behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+              },
+              "rootWatermarkColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "original"
+                    ]
+                  }
+                ],
+                "markdownDescription": "Watermark color for the repo root row. Empty = **the row's own fill colour**, stepped just clear of the row so the pattern reads as texture in the background rather than a colour laid over it — how far is `rootWatermarkContrast`. Set `original` to keep a custom SVG's own colors instead of flattening it to one shade."
+              },
+              "rootWatermarkContrast": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "How far the watermark on the repo root row steps off the fill colour it inherits, as a fraction of the distance to white (over a dark row) or black (over a light one). The step is what lifts the pattern clear of the row it paints on; keep it small so the watermarks stay a shade of the background rather than a colour of their own. Ignored once `rootWatermarkColor` pins a color. 0 = the fill colour exactly, 0.5 = a washed-out mark."
+              },
+              "rootWatermarkDimStyle": {
+                "type": "string",
+                "enum": [
+                  "smart",
+                  "text",
+                  "radius"
+                ],
+                "enumDescriptions": [
+                  "Both. The clearing does the general work and breaks the pattern up so no two folders look alike; the text cover then catches whatever a long name still runs into, which a clearing fixed to the canvas cannot know about.",
+                  "Only the text cover: every copy a row's own text reaches is dimmed whole — never clipped half way — and the rest of the scatter is left even.",
+                  "Only the baked clearing: fewer and fainter copies down the middle of the canvas where names run, full strength out in the margins. Costs nothing at paint time and never touches the row's colour."
+                ],
+                "markdownDescription": "How the watermark on the repo root row gets out of the way of what you are reading."
+              },
+              "rootWatermarkDim": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "How far the watermark is dimmed on the repo root row, as a fraction. It sets the strength of whichever dimming `rootWatermarkDimStyle` selects: how much thinner and fainter the scatter gets down the middle of the canvas, and how far a copy the row's text runs into is taken back. `0` turns dimming off entirely."
+              },
+              "rootWatermarkOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the repo root row's watermark. Keep it low — it should read as texture, not content."
+              },
+              "rootWatermarkSize": {
+                "type": "number",
+                "minimum": 4,
+                "markdownDescription": "Watermark size in px for the repo root row — the average, since individual copies vary by `rootWatermarkVariation`. The canvas is 512px, so this can go a lot larger than a text watermark normally would."
+              },
+              "innerEdgeColors": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ]
+                },
+                "markdownDescription": "Explicit colour **sequence** for the inner rows (files/folders inside)'s edge bar, drawn as 45° stripes. Empty = auto-derived from the folder's hash (see `#premiumExplorer.edgeColorCount#`)."
+              },
+              "innerEdgeWidth": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Width in px of the inner rows (files/folders inside)'s edge bar."
+              },
+              "innerEdgeStripeSize": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Thickness in px of one diagonal stripe band on the inner rows (files/folders inside)'s edge bar."
+              },
+              "innerWatermarkStyle": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "solid",
+                  "inherit"
+                ],
+                "enumDescriptions": [
+                  "No watermark — bare VS Code styling.",
+                  "Scatter the folder's watermark faintly behind the row.",
+                  "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
+                ],
+                "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): artwork scattered faintly behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+              },
+              "innerWatermarkColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "original"
+                    ]
+                  }
+                ],
+                "markdownDescription": "Watermark color for the rows inside a colored folder. Empty = **the row's own fill colour**, stepped just clear of the row so the pattern reads as texture in the background rather than a colour laid over it — how far is `innerWatermarkContrast`. Set `original` to keep a custom SVG's own colors instead of flattening it to one shade."
+              },
+              "innerWatermarkContrast": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "How far the watermark on the rows inside a colored folder steps off the fill colour it inherits, as a fraction of the distance to white (over a dark row) or black (over a light one). The step is what lifts the pattern clear of the row it paints on; keep it small so the watermarks stay a shade of the background rather than a colour of their own. Ignored once `innerWatermarkColor` pins a color. 0 = the fill colour exactly, 0.5 = a washed-out mark."
+              },
+              "innerWatermarkDimStyle": {
+                "type": "string",
+                "enum": [
+                  "smart",
+                  "text",
+                  "radius"
+                ],
+                "enumDescriptions": [
+                  "Both. The clearing does the general work and breaks the pattern up so no two folders look alike; the text cover then catches whatever a long name still runs into, which a clearing fixed to the canvas cannot know about.",
+                  "Only the text cover: every copy a row's own text reaches is dimmed whole — never clipped half way — and the rest of the scatter is left even.",
+                  "Only the baked clearing: fewer and fainter copies down the middle of the canvas where names run, full strength out in the margins. Costs nothing at paint time and never touches the row's colour."
+                ],
+                "markdownDescription": "How the watermark on the rows inside a colored folder gets out of the way of what you are reading."
+              },
+              "innerWatermarkDim": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "How far the watermark is dimmed on the rows inside a colored folder, as a fraction. It sets the strength of whichever dimming `innerWatermarkDimStyle` selects: how much thinner and fainter the scatter gets down the middle of the canvas, and how far a copy the row's text runs into is taken back. `0` turns dimming off entirely."
+              },
+              "innerWatermarkOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "Opacity of the inner rows (files/folders inside)'s watermark. Keep it low — it should read as texture, not content."
+              },
+              "innerWatermarkSize": {
+                "type": "number",
+                "minimum": 4,
+                "markdownDescription": "Watermark size in px for the rows inside a colored folder — the average, since individual copies vary by `innerWatermarkVariation`. The canvas is 512px, so this can go a lot larger than a text watermark normally would."
+              },
+              "rootWatermarkCanvas": {
+                "type": "number",
+                "minimum": 32,
+                "markdownDescription": "Size in px of the square canvas the repo root row watermark is drawn on. At the default 512 it is wider than any sidebar and ~23 rows tall, so the background reads as one unique composition instead of a repeating tile. Smaller values start to look like wallpaper."
+              },
+              "rootWatermarkDensity": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Watermarks per 100x100px of canvas for the repo root row. Higher packs them tighter; the count scales with `rootWatermarkCanvas` so resizing the canvas keeps the same look."
+              },
+              "rootWatermarkVariation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "0-1 — how much the repo root row watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `rootWatermarkRotation`."
+              },
+              "innerWatermarkCanvas": {
+                "type": "number",
+                "minimum": 32,
+                "markdownDescription": "Size in px of the square canvas the rows inside a colored folder watermark is drawn on. At the default 512 it is wider than any sidebar and ~23 rows tall, so the background reads as one unique composition instead of a repeating tile. Smaller values start to look like wallpaper."
+              },
+              "innerWatermarkDensity": {
+                "type": "number",
+                "minimum": 1,
+                "markdownDescription": "Watermarks per 100x100px of canvas for the rows inside a colored folder. Higher packs them tighter; the count scales with `innerWatermarkCanvas` so resizing the canvas keeps the same look."
+              },
+              "innerWatermarkVariation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "markdownDescription": "0-1 — how much the rows inside a colored folder watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `innerWatermarkRotation`."
+              },
+              "backgroundWatermark": {
+                "type": "string",
+                "markdownDescription": "Character/emoji, or a path to an `.svg` file, tiled faintly behind the rows — e.g. `🐳`, `⚙`, `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root. Inline `<svg>` markup and `data:image/svg+xml` URIs also work. Overrides `premiumExplorer.backgroundWatermark` for this rule."
+              },
+              "rootWatermarkRotation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 180,
+                "markdownDescription": "Max tilt in degrees for the repo root row watermarks; each copy is rotated somewhere within +/- this. Tilt is what keeps repeated copies of one mark from reading as a grid, so it stays useful even at `rootWatermarkVariation: 0`. 180 spins them any which way."
+              },
+              "innerWatermarkRotation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 180,
+                "markdownDescription": "Max tilt in degrees for the rows inside a colored folder watermarks; each copy is rotated somewhere within +/- this. Tilt is what keeps repeated copies of one mark from reading as a grid, so it stays useful even at `innerWatermarkVariation: 0`. 180 spins them any which way."
+              },
+              "rootWatermarkDimWidth": {
+                "type": "number",
+                "minimum": 8,
+                "markdownDescription": "The width in px of that clearing on the repo root row. It is baked into the canvas, so resizing the Explorer cannot change how any watermark is drawn."
+              },
+              "rootWatermarkDimHeight": {
+                "type": "number",
+                "minimum": 8,
+                "markdownDescription": "The height in px of the clearing on the repo root row — how far apart its points sit down the canvas. Capped at ``rootWatermarkCanvas``, and the shape tapers to a point at top and bottom so it tiles seamlessly."
+              },
+              "innerWatermarkDimWidth": {
+                "type": "number",
+                "minimum": 8,
+                "markdownDescription": "The width in px of that clearing on the rows inside a colored folder. It is baked into the canvas, so resizing the Explorer cannot change how any watermark is drawn."
+              },
+              "innerWatermarkDimHeight": {
+                "type": "number",
+                "minimum": 8,
+                "markdownDescription": "The height in px of the clearing on the rows inside a colored folder — how far apart its points sit down the canvas. Capped at ``innerWatermarkCanvas``, and the shape tapers to a point at top and bottom so it tiles seamlessly."
+              }
+            }
+          }
+        },
+        "premiumExplorer.rootBackgroundStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No full-row fill — bare VS Code styling.",
+            "Fill the whole row with the background color.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "solid",
+          "markdownDescription": "**Background** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.rootBackgroundColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.rootBackgroundOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "markdownDescription": "Opacity of the background fill for the repo root row."
+        },
+        "premiumExplorer.rootEdge": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No edge bar — bare VS Code styling.",
+            "Draw a colored bar on the left edge of the row.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "none",
+          "markdownDescription": "**Edge** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.rootEdgeColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.rootEdgeOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "markdownDescription": "Opacity of the edge bar for the repo root row."
+        },
+        "premiumExplorer.rootPill": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No pill — bare VS Code styling.",
+            "Draw a rounded background behind just the label text.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "none",
+          "markdownDescription": "**Pill** layer for the repo root row. `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.rootPillColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.rootPillOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "markdownDescription": "Opacity of the pill for the repo root row."
+        },
+        "premiumExplorer.rootPillRadius": {
+          "type": "number",
+          "minimum": 0,
+          "default": 6,
+          "markdownDescription": "Corner radius (px) of the pill for the repo root row."
+        },
+        "premiumExplorer.rootTextStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "bold",
+            "italic",
+            "bold-italic"
+          ],
+          "default": "none",
+          "markdownDescription": "**Text** weight/style for the repo root row's label.",
+          "enumDescriptions": [
+            "No weight/style change — the theme decides.",
+            "Bold label.",
+            "Italic label.",
+            "Bold + italic label."
+          ]
+        },
+        "premiumExplorer.rootTextColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Label text color for the repo root row. Empty = leave it to the theme."
+        },
+        "premiumExplorer.rootEdgeColors": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "color-hex"
+              }
+            ]
+          },
+          "default": [],
+          "markdownDescription": "Explicit colour **sequence** for the repo root row's edge bar, drawn as 45° stripes. Empty = auto-derived from the folder's hash (see `#premiumExplorer.edgeColorCount#`)."
+        },
+        "premiumExplorer.rootEdgeWidth": {
+          "type": "number",
+          "minimum": 1,
+          "default": 3,
+          "markdownDescription": "Width in px of the repo root row's edge bar."
+        },
+        "premiumExplorer.rootEdgeStripeSize": {
+          "type": "number",
+          "minimum": 1,
+          "default": 6,
+          "markdownDescription": "Thickness in px of one diagonal stripe band on the repo root row's edge bar."
+        },
+        "premiumExplorer.rootWatermarkStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No watermark — bare VS Code styling.",
+            "Scatter the folder's watermark faintly behind the row.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
+          ],
+          "default": "none",
+          "markdownDescription": "**Watermark** layer for the repo root row: a faint tiled watermark behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+        },
+        "premiumExplorer.rootWatermarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "",
+                "original"
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Watermark color for the repo root row. Empty = **the row's own fill colour**, stepped just clear of the row so the pattern reads as texture in the background rather than a colour laid over it — how far is `#premiumExplorer.rootWatermarkContrast#`. Set `original` to keep a custom SVG's own colors instead of flattening it to one shade."
+        },
+        "premiumExplorer.rootWatermarkContrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.15,
+          "markdownDescription": "How far the watermark on the repo root row steps off the fill colour it inherits, as a fraction of the distance to white (over a dark row) or black (over a light one). The step is what lifts the pattern clear of the row it paints on; keep it small so the watermarks stay a shade of the background rather than a colour of their own. Ignored once `#premiumExplorer.rootWatermarkColor#` pins a color. 0 = the fill colour exactly, 0.5 = a washed-out mark."
+        },
+        "premiumExplorer.rootWatermarkDimStyle": {
+          "type": "string",
+          "enum": [
+            "smart",
+            "text",
+            "radius"
+          ],
+          "enumDescriptions": [
+            "Both. The clearing does the general work and breaks the pattern up so no two folders look alike; the text cover then catches whatever a long name still runs into, which a clearing fixed to the canvas cannot know about.",
+            "Only the text cover: every copy a row's own text reaches is dimmed whole — never clipped half way — and the rest of the scatter is left even.",
+            "Only the baked clearing: fewer and fainter copies down the middle of the canvas where names run, full strength out in the margins. Costs nothing at paint time and never touches the row's colour."
+          ],
+          "markdownDescription": "How the watermark on the repo root row gets out of the way of what you are reading.",
+          "default": "smart"
+        },
+        "premiumExplorer.rootWatermarkDim": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "markdownDescription": "How far the watermark is dimmed on the repo root row, as a fraction. It sets the strength of whichever dimming `#premiumExplorer.rootWatermarkDimStyle#` selects: how much thinner and fainter the scatter gets down the middle of the canvas, and how far a copy the row's text runs into is taken back. `0` turns dimming off entirely."
+        },
+        "premiumExplorer.rootWatermarkOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3,
+          "markdownDescription": "Opacity of the repo root row watermark. It paints over the row's fill, so this is how far the pattern darkens it."
+        },
+        "premiumExplorer.rootWatermarkSize": {
+          "type": "number",
+          "minimum": 4,
+          "default": 24,
+          "markdownDescription": "Watermark size in px for the repo root row — the average, since individual copies vary by `rootWatermarkVariation`. The canvas is 512px, so this can go a lot larger than a text watermark normally would."
+        },
+        "premiumExplorer.innerBackgroundStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No full-row fill — bare VS Code styling.",
+            "Fill the whole row with the background color.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "inherit",
+          "markdownDescription": "**Background** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.innerBackgroundColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.innerBackgroundOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.15,
+          "markdownDescription": "Opacity of the background fill for the inner rows (files/folders inside)."
+        },
+        "premiumExplorer.innerEdge": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No edge bar — bare VS Code styling.",
+            "Draw a colored bar on the left edge of the row.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "inherit",
+          "markdownDescription": "**Edge** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.innerEdgeColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.innerEdgeOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "markdownDescription": "Opacity of the edge bar for the inner rows (files/folders inside)."
+        },
+        "premiumExplorer.innerPill": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No pill — bare VS Code styling.",
+            "Draw a rounded background behind just the label text.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows (blend into the parent instead of punching a hole in it)."
+          ],
+          "default": "inherit",
+          "markdownDescription": "**Pill** layer for the inner rows (files/folders inside). `none` = not painted, `solid` = this rule's color, `inherit` = the enclosing colored folder's inner look."
+        },
+        "premiumExplorer.innerPillColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+        },
+        "premiumExplorer.innerPillOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "markdownDescription": "Opacity of the pill for the inner rows (files/folders inside)."
+        },
+        "premiumExplorer.innerPillRadius": {
+          "type": "number",
+          "minimum": 0,
+          "default": 6,
+          "markdownDescription": "Corner radius (px) of the pill for the inner rows (files/folders inside)."
+        },
+        "premiumExplorer.innerTextStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "bold",
+            "italic",
+            "bold-italic"
+          ],
+          "default": "none",
+          "markdownDescription": "**Text** weight/style for the inner rows (files/folders inside)'s label.",
+          "enumDescriptions": [
+            "No weight/style change — the theme decides.",
+            "Bold label.",
+            "Italic label.",
+            "Bold + italic label."
+          ]
+        },
+        "premiumExplorer.innerTextColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Label text color for the inner rows (files/folders inside). Empty = leave it to the theme."
+        },
+        "premiumExplorer.innerEdgeColors": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "color-hex"
+              }
+            ]
+          },
+          "default": [],
+          "markdownDescription": "Explicit colour **sequence** for the inner rows (files/folders inside)'s edge bar, drawn as 45° stripes. Empty = auto-derived from the folder's hash (see `#premiumExplorer.edgeColorCount#`)."
+        },
+        "premiumExplorer.innerEdgeWidth": {
+          "type": "number",
+          "minimum": 1,
+          "default": 3,
+          "markdownDescription": "Width in px of the inner rows (files/folders inside)'s edge bar."
+        },
+        "premiumExplorer.innerEdgeStripeSize": {
+          "type": "number",
+          "minimum": 1,
+          "default": 6,
+          "markdownDescription": "Thickness in px of one diagonal stripe band on the inner rows (files/folders inside)'s edge bar."
+        },
+        "premiumExplorer.innerWatermarkStyle": {
+          "type": "string",
+          "enum": [
+            "none",
+            "solid",
+            "inherit"
+          ],
+          "enumDescriptions": [
+            "No watermark — bare VS Code styling.",
+            "Scatter the folder's watermark faintly behind the row.",
+            "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
+          ],
+          "default": "inherit",
+          "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): a faint tiled watermark behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+        },
+        "premiumExplorer.innerWatermarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "",
+                "original"
+              ]
+            }
+          ],
+          "default": "",
+          "markdownDescription": "Watermark color for the rows inside a colored folder. Empty = **the row's own fill colour**, stepped just clear of the row so the pattern reads as texture in the background rather than a colour laid over it — how far is `#premiumExplorer.innerWatermarkContrast#`. Set `original` to keep a custom SVG's own colors instead of flattening it to one shade."
+        },
+        "premiumExplorer.innerWatermarkContrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.15,
+          "markdownDescription": "How far the watermark on the rows inside a colored folder steps off the fill colour it inherits, as a fraction of the distance to white (over a dark row) or black (over a light one). The step is what lifts the pattern clear of the row it paints on; keep it small so the watermarks stay a shade of the background rather than a colour of their own. Ignored once `#premiumExplorer.innerWatermarkColor#` pins a color. 0 = the fill colour exactly, 0.5 = a washed-out mark."
+        },
+        "premiumExplorer.innerWatermarkDimStyle": {
+          "type": "string",
+          "enum": [
+            "smart",
+            "text",
+            "radius"
+          ],
+          "enumDescriptions": [
+            "Both. The clearing does the general work and breaks the pattern up so no two folders look alike; the text cover then catches whatever a long name still runs into, which a clearing fixed to the canvas cannot know about.",
+            "Only the text cover: every copy a row's own text reaches is dimmed whole — never clipped half way — and the rest of the scatter is left even.",
+            "Only the baked clearing: fewer and fainter copies down the middle of the canvas where names run, full strength out in the margins. Costs nothing at paint time and never touches the row's colour."
+          ],
+          "markdownDescription": "How the watermark on the rows inside a colored folder gets out of the way of what you are reading.",
+          "default": "smart"
+        },
+        "premiumExplorer.innerWatermarkDim": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "markdownDescription": "How far the watermark is dimmed on the rows inside a colored folder, as a fraction. It sets the strength of whichever dimming `#premiumExplorer.innerWatermarkDimStyle#` selects: how much thinner and fainter the scatter gets down the middle of the canvas, and how far a copy the row's text runs into is taken back. `0` turns dimming off entirely."
+        },
+        "premiumExplorer.innerWatermarkOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3,
+          "markdownDescription": "Opacity of the inner rows watermark. It paints over the row's fill, so this is how far the pattern darkens it."
+        },
+        "premiumExplorer.innerWatermarkSize": {
+          "type": "number",
+          "minimum": 4,
+          "default": 24,
+          "markdownDescription": "Watermark size in px for the rows inside a colored folder — the average, since individual copies vary by `innerWatermarkVariation`. The canvas is 512px, so this can go a lot larger than a text watermark normally would."
+        },
+        "premiumExplorer.innerWatermarkCanvas": {
+          "type": "number",
+          "minimum": 32,
+          "default": 512,
+          "markdownDescription": "Size in px of the square canvas the rows inside a colored folder watermark is drawn on. At the default 512 it is wider than any sidebar and ~23 rows tall, so the background reads as one unique composition instead of a repeating tile. Smaller values start to look like wallpaper."
+        },
+        "premiumExplorer.innerWatermarkDensity": {
+          "type": "number",
+          "minimum": 1,
+          "default": 4,
+          "markdownDescription": "Watermarks per 100x100px of canvas for the rows inside a colored folder. Higher packs them tighter; the count scales with `innerWatermarkCanvas` so resizing the canvas keeps the same look."
+        },
+        "premiumExplorer.innerWatermarkVariation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.4,
+          "markdownDescription": "0-1 — how much the rows inside a colored folder watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `innerWatermarkRotation`."
+        },
+        "premiumExplorer.edgeColorCount": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 3,
+          "markdownDescription": "How many colours an **auto-derived** edge sequence uses. `1` reproduces a plain single-colour bar. Ignored where `*EdgeColors` is set explicitly."
+        },
+        "premiumExplorer.colorBy": {
+          "type": "string",
+          "enum": [
+            "name",
+            "path"
+          ],
+          "enumDescriptions": [
+            "Hash the folder name, so folders with the same name share a color.",
+            "Hash the full folder path, so every folder gets an independent color."
+          ],
+          "default": "name",
+          "description": "What to hash when picking an automatic color for a Git repository folder."
+        },
+        "premiumExplorer.badge": {
+          "type": "string",
+          "default": "",
+          "maxLength": 2,
+          "markdownDescription": "Optional badge (max 2 characters) shown next to Git repository folders, e.g. `●`. Leave empty to color the label only."
+        },
+        "premiumExplorer.palette": {
+          "type": "array",
+          "default": [
+            "#e6194b",
+            "#3cb44b",
+            "#f58231",
+            "#4363d8",
+            "#911eb4",
+            "#008080",
+            "#f032e6",
+            "#9a6324",
+            "#808000",
+            "#c99700",
+            "#2a9d8f",
+            "#d62728",
+            "#7f4fc9",
+            "#1f9e89",
+            "#b5651d",
+            "#5d8aa8"
+          ],
+          "maxItems": 16,
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "color-hex"
+              }
+            ]
+          },
+          "markdownDescription": "Colors (hex) used to auto-assign a per-repo color by hashing its name/path. Up to 16 entries. Fewer entries = fewer distinct colors."
+        },
+        "premiumExplorer.defaultColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            }
+          ],
+          "default": "#808080",
+          "markdownDescription": "Base color for `manual` rules — the fallback every layer uses when its own `*Color` is empty. `git` rules ignore it and hash each repo against `#premiumExplorer.palette#` instead."
+        },
+        "premiumExplorer.selectedBackgroundColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "shift",
+                "invert"
+              ],
+              "enumDescriptions": [
+                "The color the row already shows, lifted a step away from the theme.",
+                "The color that row is filled with, at full strength."
+              ]
+            }
+          ],
+          "default": "invert",
+          "markdownDescription": "Background of the selected/focused Explorer row inside a colored folder.\n\n- `shift` — whatever the row already shows, lifted a step (`#premiumExplorer.selectedShift#`), so the selection reads as *this row, marked* instead of a foreign highlight. Carries its own strength, so `#premiumExplorer.selectedOpacity#` does not apply: compositing a shift back over the color it was measured from would cancel it out.\n- `invert` — the color that row is filled with (its `*BackgroundColor`, else the folder base), at `#premiumExplorer.selectedOpacity#`.\n- A hex such as `#ffffff`, at `#premiumExplorer.selectedOpacity#`.\n\nApplies only when `background` is listed in `#premiumExplorer.selectedOverrides#`."
+        },
+        "premiumExplorer.selectedShift": {
+          "type": "number",
+          "default": 0.12,
+          "minimum": 0,
+          "maximum": 1,
+          "markdownDescription": "How far `shift` lifts the selected row off the color it already shows, as a fraction of the distance to white on a dark theme (black on a light one). `0.05` is barely there; `0.12` reads clearly without losing the folder's color; `0.4` is close to a plain highlight. Only used when `#premiumExplorer.selectedBackgroundColor#` is `shift`; the Explorer shifts by less than half this while it is unfocused."
+        },
+        "premiumExplorer.selectedTextColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "Text color of the selected/focused row. `auto` = black or white chosen for contrast, or a hex."
+        },
+        "premiumExplorer.selectedOpacity": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1,
+          "markdownDescription": "Opacity of the selected row background (1 = solid)."
+        },
+        "premiumExplorer.selectedBold": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Make the selected/focused row’s label bold."
+        },
+        "premiumExplorer.selectedBorder": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "auto"
+              ]
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "Border (focus ring) drawn around the selected row **while the Explorer is focused**. `none` = no border, `auto` = the theme’s focus-outline color, or a hex."
+        },
+        "premiumExplorer.selectedInactiveDarken": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": 0,
+          "maximum": 1,
+          "markdownDescription": "How much darker the selected row becomes when the Explorer is **not** focused (0 = same color, 1 = black). The border is also dropped while unfocused, mirroring VS Code’s inactive selection."
+        },
+        "premiumExplorer.backgroundWatermark": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Default watermark artwork for every colored folder. Character/emoji, or a path to an `.svg` file, tiled faintly behind the rows — e.g. `🐳`, `⚙`, `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root. Inline `<svg>` markup and `data:image/svg+xml` URIs also work. Empty = each folder uses the first letter of its own name. Whether it is *drawn* is up to `rootWatermarkStyle` / `innerWatermarkStyle`."
+        },
+        "premiumExplorer.rootWatermarkCanvas": {
+          "type": "number",
+          "minimum": 32,
+          "default": 512,
+          "markdownDescription": "Size in px of the square canvas the repo root row watermark is drawn on. At the default 512 it is wider than any sidebar and ~23 rows tall, so the background reads as one unique composition instead of a repeating tile. Smaller values start to look like wallpaper."
+        },
+        "premiumExplorer.rootWatermarkDensity": {
+          "type": "number",
+          "minimum": 1,
+          "default": 4,
+          "markdownDescription": "Watermarks per 100x100px of canvas for the repo root row. Higher packs them tighter; the count scales with `rootWatermarkCanvas` so resizing the canvas keeps the same look."
+        },
+        "premiumExplorer.rootWatermarkVariation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.4,
+          "markdownDescription": "0-1 — how much the repo root row watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `rootWatermarkRotation`."
+        },
+        "premiumExplorer.rootWatermarkRotation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "default": 40,
+          "markdownDescription": "Max tilt in degrees for the repo root row watermarks; each copy is rotated somewhere within +/- this. Tilt is what keeps repeated copies of one mark from reading as a grid, so it stays useful even at `rootWatermarkVariation: 0`. 180 spins them any which way."
+        },
+        "premiumExplorer.innerWatermarkRotation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "default": 40,
+          "markdownDescription": "Max tilt in degrees for the rows inside a colored folder watermarks; each copy is rotated somewhere within +/- this. Tilt is what keeps repeated copies of one mark from reading as a grid, so it stays useful even at `innerWatermarkVariation: 0`. 180 spins them any which way."
+        },
+        "premiumExplorer.selectedOverrides": {
+          "type": "array",
+          "default": [
+            "background",
+            "edge",
+            "watermarks",
+            "text-color"
+          ],
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "background",
+              "edge",
+              "watermarks",
+              "text-color",
+              "pills"
+            ],
+            "enumDescriptions": [
+              "Fill the row with `selectedBackgroundColor`.",
+              "Repaint the left edge bar flat in the selection color.",
+              "Re-tint the watermark to `selectedWatermarkColor`.",
+              "Paint the label with `selectedTextColor`.",
+              "Fill the pill behind the label with the selection color."
+            ]
+          },
+          "markdownDescription": "Which styles the selection color takes over. **Only what is listed changes on a selected row** — everything else keeps painting exactly as it does unselected.\n\n- `[\"edge\"]` — only the edge bar turns the selection color; the fill, watermark and label are untouched.\n- `[]` — selection changes nothing but the focus ring (`selectedBorder`, which is always its own setting).\n- Default `[\"background\", \"edge\", \"watermarks\", \"text-color\"]` — the row is filled, the bar and watermark are re-tinted to match, and the label takes `selectedTextColor`.\n\n`pills` is out of the default: a pill the selection has not taken over keeps its own fill and gains a traced edge, so an `invert` highlight painting the row in the pill color does not swallow it."
+        },
+        "premiumExplorer.selectedWatermarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "Watermark color on a selected row, when `watermarks` is in `#premiumExplorer.selectedOverrides#`.\n\n- `auto` (default) — a shade just off the selection color: darker when the selection is light, lighter when it is dark. How far off is `#premiumExplorer.selectedWatermarkContrast#`.\n- A hex — that exact color, whatever the selection is."
+        },
+        "premiumExplorer.selectedWatermarkContrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.08,
+          "markdownDescription": "How far the `auto` selected watermark sits off the color the row is actually painted, as a fraction of the distance to black or white. Only used when `#premiumExplorer.selectedWatermarkColor#` is `auto` and `watermarks` is in `#premiumExplorer.selectedOverrides#`.\n\nThe watermark's normal color is picked to read against the folder's own fill, so on a bright selection it lands far too dark. This pulls it back to just off the selection — present, but with no contrast to fight the label. `selectedOpacity` is accounted for, so the step is measured from what is on screen rather than the configured color.\n\n- `0` — identical to the selection (invisible).\n- `0.08` (default) — barely there.\n- `0.4+` — an obvious pattern under the selection."
+        },
+        "premiumExplorer.rootWatermarkDimWidth": {
+          "type": "number",
+          "minimum": 8,
+          "markdownDescription": "The width in px of that clearing on the repo root row. It is baked into the canvas, so resizing the Explorer cannot change how any watermark is drawn.",
+          "default": 260
+        },
+        "premiumExplorer.rootWatermarkDimHeight": {
+          "type": "number",
+          "minimum": 8,
+          "markdownDescription": "The height in px of the clearing on the repo root row — how far apart its points sit down the canvas. Capped at `#premiumExplorer.rootWatermarkCanvas#`, and the shape tapers to a point at top and bottom so it tiles seamlessly.",
+          "default": 560
+        },
+        "premiumExplorer.innerWatermarkDimWidth": {
+          "type": "number",
+          "minimum": 8,
+          "markdownDescription": "The width in px of that clearing on the rows inside a colored folder. It is baked into the canvas, so resizing the Explorer cannot change how any watermark is drawn.",
+          "default": 260
+        },
+        "premiumExplorer.innerWatermarkDimHeight": {
+          "type": "number",
+          "minimum": 8,
+          "markdownDescription": "The height in px of the clearing on the rows inside a colored folder — how far apart its points sit down the canvas. Capped at `#premiumExplorer.innerWatermarkCanvas#`, and the shape tapers to a point at top and bottom so it tiles seamlessly.",
+          "default": 560
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "package:vsix": "node -e \"require('fs').mkdirSync('dist/out',{recursive:true})\" && vsce package --no-dependencies --out dist/out/",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "@types/vscode": "^1.133.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.5.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  }
+}

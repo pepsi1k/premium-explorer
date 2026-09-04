@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    # Optional hardening: add `environment: marketplace` here and store VSCE_PAT
+    # as an environment secret to require manual approval before each publish.
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Verify tag matches package.json version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME implies version $tag_version but package.json says $pkg_version."
+            echo "Bump package.json, commit, then re-tag."
+            exit 1
+          fi
+          echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
+        id: version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package VSIX
+        run: pnpm run package:vsix
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsix="dist/out/premium-explorer-${{ steps.version.outputs.version }}.vsix"
+          test -f "$vsix" || { echo "::error::$vsix not found"; ls -la dist/out; exit 1; }
+          pnpm exec vsce publish --packagePath "$vsix"
+
+      - name: Wait for Marketplace validation
+        id: validate
+        continue-on-error: true
+        env:
+          # Public repo: Actions minutes are free, so wait generously rather
+          # than give up while the marketplace is still validating.
+          TIMEOUT_SECONDS: '3600'
+          INTERVAL_SECONDS: '30'
+        run: |
+          node scripts/wait-for-marketplace.mjs \
+            pepsik.premium-explorer "${{ steps.version.outputs.version }}"
+
+      - name: Upload VSIX artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: premium-explorer-${{ steps.version.outputs.version }}
+          path: dist/out/*.vsix
+          if-no-files-found: warn
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          VALIDATION: ${{ steps.validate.outcome }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::notice::Telegram secrets not configured, skipping notification."
+            exit 0
+          fi
+
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          item_url="https://marketplace.visualstudio.com/items?itemName=pepsik.premium-explorer"
+
+          if [ "$JOB_STATUS" = "success" ] && [ "$VALIDATION" = "success" ]; then
+            text="[github] ✅ <b>Premium Explorer $GITHUB_REF_NAME</b> is live on the VS Code Marketplace.
+
+          <a href=\"$item_url\">Marketplace listing</a> · <a href=\"$run_url\">workflow run</a>
+
+          Install: <code>code --install-extension pepsik.premium-explorer</code>"
+          elif [ "$JOB_STATUS" = "success" ]; then
+            text="[github] ⏳ <b>Premium Explorer $GITHUB_REF_NAME</b> uploaded, but still showing <i>Verifying</i> after an hour.
+
+          Nothing is wrong yet — validation occasionally runs long. It will go live on its own, or the marketplace will email you if it was rejected.
+
+          <a href=\"$item_url\">Marketplace listing</a> · <a href=\"$run_url\">workflow run</a>"
+          else
+            text="[github] ❌ <b>Premium Explorer $GITHUB_REF_NAME</b> release failed (<code>$JOB_STATUS</code>).
+
+          <a href=\"$run_url\">See the workflow run</a>"
+          fi
+
+          curl -sS --fail-with-body -o /dev/null \
+            -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "disable_web_page_preview=true"

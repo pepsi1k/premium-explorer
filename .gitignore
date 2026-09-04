@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build / bundle output
+dist/
+out/
+
+# Extension test runner (downloaded VS Code + test artifacts)
+.vscode-test/
+.vscode-test.mjs.log
+
+# Packaged extension
+*.vsix
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,129 @@
+# Change Log
+
+All notable changes to the "premium-explorer" extension are documented here, following
+[Keep a Changelog](http://keepachangelog.com/).
+
+## [Unreleased]
+
+### Changed
+- **Renamed to Premium Explorer.** The extension id is now `pepsik.premium-explorer`,
+  every setting is `premiumExplorer.*`, and the generated pair is
+  `premium-explorer.css` / `premium-explorer.js`. **Settings do not carry over** —
+  rename the `premiumStash.*` keys in your settings. Global storage is keyed on the
+  extension id, so the generated files move with it; the stale
+  `vscode_custom_css.imports` entries pointing at the old pair are now dropped
+  automatically when the files are generated, instead of leaving two painters
+  fighting over the same rows.
+- **`Glyph` is now `Watermark` everywhere.** `backgroundGlyph` →
+  `backgroundWatermark`; `*GlyphStyle`, `*GlyphColor`, `*GlyphContrast`,
+  `*GlyphOpacity`, `*GlyphSize`, `*GlyphCanvas`, `*GlyphDensity`,
+  `*GlyphVariation`, `*GlyphRotation`, `*GlyphDim`, `*GlyphDimStyle`,
+  `*GlyphDimWidth`, `*GlyphDimHeight` → the same names with `Watermark`;
+  `selectedGlyphColor` / `selectedGlyphContrast` →
+  `selectedWatermarkColor` / `selectedWatermarkContrast`; and the `glyphs` value of
+  `selectedOverrides` → `watermarks`.
+- Layer baking moved out of `backgroundStyles.ts` into `src/layers.ts`, which now
+  owns how one folder's row styling is turned into what the painter applies.
+
+### Added
+- **`selectedBackgroundColor: "shift"`** — the selected row keeps the colour it
+  already shows and lifts it a step (`premiumExplorer.selectedShift`, default
+  `0.12`), so the selection reads as *this row, marked* rather than a foreign
+  highlight, and the watermark on it stays the folder's own colour instead of
+  going grey against a bright fill. A shift carries its own strength, so
+  `selectedOpacity` does not apply to it — compositing a shift back over the
+  colour it was measured from would cancel it out.
+- **Path-scoped rules** (`premiumExplorer.rules`): each rule points at a folder and
+  picks an engine — `git` (auto-color every repo found under it), `manual` (color
+  the folder and its contents with a chosen hex), or `default` (same, using
+  `premiumExplorer.defaultColor`; also the engine used when `engine` is omitted).
+  Rules resolve by path specificity, so a deeper rule overrides a shallower one.
+- Deterministic automatic color chosen by hashing, with a configurable palette.
+- Optional Explorer **background** coloring (colored folders + their contents,
+  hover, and selection highlight) generated for the `be5invis.vscode-custom-css`
+  extension.
+- Settings for text/background opacity, selection background/text/bold, and badge.
+- **Two-state selection** like VS Code's native list: a focus ring while the
+  Explorer is focused (`premiumExplorer.selectedBorder`) and a darker, ring-less fill
+  when it isn't (`premiumExplorer.selectedInactiveDarken`).
+- **Separate root/inner styling.** `premiumExplorer.rootStyle` and
+  `premiumExplorer.innerStyle` each choose `full` (whole row), `pill` (rounded
+  background behind the label text), or `edge` (left bar); `innerStyle` also accepts
+  `none` to leave the contents uncolored.
+- **Per-rule overrides**: a rule may set `rootOpacity`, `contentsOpacity`,
+  `colorText`, `rootStyle`/`rootBackground`/`rootText`, and
+  `innerStyle`/`innerBackground`/`innerText` to override the globals for that path.
+- **Per-workspace background scoping**: the global injected files now store a union
+  of every configured workspace's colors, and the injected script paints only the
+  workspace shown in the current window — so opening another project no longer
+  inherits its colors, and multiple windows can each show their own. This also stops
+  windows from clobbering each other's colors (each replaces only its own entry).
+
+### Fixed
+- `premiumExplorer.enabled = false` now clears the generated background/selection
+  styling instead of leaving the last-generated files painting.
+- Background CSS/JS were imported with a `vscode-userdata:` URL that
+  vscode-custom-css can't read; they're now imported as `file://` URLs.
+
+### Changed
+- Reworked the model from "color all Git repos in the workspace" to explicit
+  `premiumExplorer.rules`. **With no rules, nothing is colored.**
+- Split the implementation into focused modules and moved the injected browser
+  script into `media/inject.js` for readability.
+
+### Removed
+- `premiumExplorer.overrides` and `premiumExplorer.colorContents` — both are now
+  expressed via `premiumExplorer.rules` (a `manual` rule replaces an override and
+  always colors the folder's contents).
+
+## [1.1.0] - 2026-09-04
+
+### Added
+- **Glyph watermark layer.** `rootGlyphStyle`/`innerGlyphStyle` scatter a folder's
+  mark faintly behind its rows. The artwork comes from `backgroundGlyph` — a
+  character or emoji, a path to an `.svg` file, inline `<svg>` markup, or a data
+  URI — and falls back to the folder name's initial. It is drawn as one canvas
+  anchored to the top of the folder's block, so the scatter flows unbroken across
+  the root row and everything nested inside rather than restarting per row.
+  Tunable per row-kind and per rule: `*GlyphColor`, `*GlyphContrast`,
+  `*GlyphOpacity`, `*GlyphSize`, `*GlyphCanvas`, `*GlyphDensity`,
+  `*GlyphVariation`, `*GlyphRotation`.
+- **Striped edge bar.** `rootEdgeColors`/`innerEdgeColors` paint the left bar as a
+  45-degree stripe sequence, with `*EdgeWidth`, `*EdgeStripeSize` and a global
+  `edgeColorCount` for automatically derived sequences.
+- **`premiumExplorer.selectedOverrides`** — which styles the selection colour takes
+  over (`background`, `edge`, `glyphs`, `text-color`, `pills`). Only what is listed
+  changes on a selected row; every other layer keeps painting as it does
+  unselected, so a selected row still shows which folder it is in.
+- **`premiumExplorer.selectedGlyphColor` / `selectedGlyphContrast`** — the watermark's
+  tint on a selected row: `auto` takes a shade off the colour the row actually
+  paints (so `selectedOpacity` is accounted for), or pin a hex.
+- **Inline rename.** While the rename box is open the row shifts a step off its own
+  fill, and the box itself goes transparent with a border, so the row's colour and
+  watermark carry through instead of a theme-coloured slab dropping into the tree.
+- A colour picker in the Settings UI for every colour field, including the ones
+  nested inside `premiumExplorer.rules`.
+
+### Changed
+- The watermark's default tint now **inherits the row's fill colour** and steps
+  clear of what the row composites to (`*GlyphContrast`, default `0.15`). It used
+  to be a fixed 45% darkening of the nominal fill, which ignored the fill's opacity
+  and the theme behind it — on a low-opacity fill that landed within ~4/255 of the
+  row and was invisible.
+
+### Fixed
+- SVG artwork exported from Sketch/Figma rendered as nothing. Those exports wrap the
+  drawing in `<g stroke="none" fill="none">` and put the real colour on each path;
+  flattening the artwork to one shade stripped those colours and every shape fell
+  back to the group's `none`. That scaffolding is now dropped from artwork that
+  fills anything, while an outline icon — where `fill="none"` *is* the drawing —
+  keeps it.
+- The rename box hid the typed text and the caret: the label colour is `!important`
+  and the input inherited it, and `caret-color` follows `color`.
+- The watermark on a selected row lost its contrast against the selection fill.
+- Renaming a colored folder briefly dropped the colour from every row beneath it,
+  because the open rename box empties the label the tree is matched by.
+
+### Removed
+- The per-rule `color` key. It duplicated the layer colours (`rootBackgroundColor`,
+  `innerBackgroundColor`, and the rest), which are what actually paint.
