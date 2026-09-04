@@ -206,8 +206,13 @@ export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt
 export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Part | undefined): Part {
 	const baseHex = folder.hex;
 	// The color this row is actually filled with: what the watermark shades itself
-	// against, and what `selectedBackgroundColor: "invert"` reuses.
-	const fillHex = p.backgroundColor ?? baseHex;
+	// against, and what the `"invert"`/`"shift"` selections reuse. An `inherit`
+	// background adopts the enclosing folder's fill wholesale, so its *color* has to
+	// come from there too — falling back to this folder's own base would report grey
+	// (`defaultColor`, for a manual rule) for a row painted in its parent's color,
+	// and every shade derived from it would be grey with it.
+	const fillHex = p.backgroundColor
+		?? (p.backgroundStyle === 'inherit' && inheritFrom ? inheritFrom.solid : baseHex);
 	return {
 		background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background),
 		edge: buildStripe(p, folder.sequence, inheritFrom?.edge),

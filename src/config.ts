@@ -207,9 +207,14 @@ export interface SelectionConfig {
 	watermarkContrast: number;
 }
 
-/** A style the selection color may take over rather than leave alone. */
-export type SelectedOverride = 'background' | 'edge' | 'watermarks' | 'text-color' | 'pills';
-const SELECTED_OVERRIDES: readonly string[] = ['background', 'edge', 'watermarks', 'text-color', 'pills'];
+/**
+ * A style the selection color may take over rather than leave alone. The edge bar
+ * is deliberately not one of them: it is the row's narrowest mark and the only one
+ * that still says which folder a selected — or renaming — row belongs to, so it
+ * always keeps its own colours.
+ */
+export type SelectedOverride = 'background' | 'watermarks' | 'text-color' | 'pills';
+const SELECTED_OVERRIDES: readonly string[] = ['background', 'watermarks', 'text-color', 'pills'];
 
 /** All settings, resolved into ready-to-use values. */
 export interface FolderColorerConfig {
@@ -369,7 +374,8 @@ export function readConfig(): FolderColorerConfig {
 /**
  * Which styles the selection color takes over. Only what is named here changes on
  * a selected row; everything else keeps painting exactly as it does unselected, so
- * `["edge"]` recolors just the edge bar and leaves the fill, watermark and label.
+ * `["background"]` recolors just the fill and leaves the watermark and label. An
+ * `"edge"` left over from an older config is simply dropped here.
  */
 function parseOverrides(raw: unknown): SelectedOverride[] {
 	if (!Array.isArray(raw)) {

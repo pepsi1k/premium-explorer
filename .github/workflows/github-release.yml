@@ -1,0 +1,119 @@
+name: GitHub Release
+
+# Attaches the packaged VSIX to a GitHub Release, so every tag has an installable
+# artifact regardless of what the Marketplace does with it. Deliberately separate
+# from release.yml: a `vsce publish` failure (an expired VSCE_PAT is the usual one)
+# must not also cost you the downloadable build, and a Marketplace version that has
+# already been accepted can never be re-published, whereas a release asset can be
+# re-uploaded freely.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to package and attach the VSIX to (e.g. v1.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write # creating the release and uploading its assets
+
+concurrency:
+  group: github-release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and attach VSIX
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # A manual run names the tag; a tag push already is one.
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Verify tag matches package.json version
+        id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          tag_version="${TAG#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::Tag $TAG implies version $tag_version but package.json says $pkg_version."
+            echo "Bump package.json, commit, then re-tag."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package VSIX
+        run: pnpm run package:vsix
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Everything under `## [<version>]` up to the next `## ` heading.
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No '## [$VERSION]' section in CHANGELOG.md — falling back to generated notes."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NOTES_FOUND: ${{ steps.notes.outputs.found }}
+        run: |
+          vsix="dist/out/premium-explorer-${VERSION}.vsix"
+          test -f "$vsix" || { echo "::error::$vsix not found"; ls -la dist/out; exit 1; }
+
+          if [ "$NOTES_FOUND" = "true" ]; then
+            notes_args=(--notes-file notes.md)
+          else
+            notes_args=(--generate-notes)
+          fi
+
+          # Re-running a release (a failed publish, a re-tag) must not fail on an
+          # existing release, so update it in place and overwrite the asset.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Premium Explorer $TAG" "${notes_args[@]}"
+            gh release upload "$TAG" "$vsix" --clobber
+          else
+            gh release create "$TAG" "$vsix" \
+              --title "Premium Explorer $TAG" \
+              --verify-tag \
+              "${notes_args[@]}"
+          fi
+
+          echo "### Premium Explorer $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "VSIX attached: \`$(basename "$vsix")\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Install: \`code --install-extension $(basename "$vsix")\`" >> "$GITHUB_STEP_SUMMARY"
+          gh release view "$TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

@@ -3,9 +3,28 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
-## [Unreleased]
+## [1.2.0] - 2026-09-04
+
+### Fixed
+- **A selected or renamed row no longer washes out to grey.** Both colours were
+  taken by stepping the row's own colour toward white, which moves every channel
+  the same distance and so flattens the ratios between them — a dark, saturated row
+  arrived at grey carrying none of the folder it belonged to. The step now mixes the
+  folder's own colour back in first (`selectedShift` scales both moves), so a
+  selected row reads as *this row, marked, in this folder's colour*, and `F2` shows
+  the row shifted rather than a grey band.
+- **An `inherit` background now reports the colour it actually paints.** A rule whose
+  contents blended into an enclosing folder still described itself with its own base
+  colour — `defaultColor`, grey, for a manual rule — so `selectedBackgroundColor:
+  "invert"`, the rename shift and the automatic watermark tint all derived grey for a
+  row that was visibly painted in its parent's colour.
 
 ### Changed
+- **The edge bar is never taken over by the selection.** `edge` is gone from
+  `premiumExplorer.selectedOverrides` (values left over in a config are ignored): the
+  bar is the narrowest mark on a row and the only one that still says which folder a
+  selected — or renaming — row belongs to, so spending it on saying "selected", which
+  the fill over the rest of the row already says, cost more than it bought.
 - **Renamed to Premium Explorer.** The extension id is now `pepsik.premium-explorer`,
   every setting is `premiumExplorer.*`, and the generated pair is
   `premium-explorer.css` / `premium-explorer.js`. **Settings do not carry over** —

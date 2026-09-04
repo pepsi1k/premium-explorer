@@ -4,7 +4,7 @@
   "icon": "images/logo-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -1323,7 +1323,6 @@
           "type": "array",
           "default": [
             "background",
-            "edge",
             "watermarks",
             "text-color"
           ],
@@ -1332,20 +1331,18 @@
             "type": "string",
             "enum": [
               "background",
-              "edge",
               "watermarks",
               "text-color",
               "pills"
             ],
             "enumDescriptions": [
               "Fill the row with `selectedBackgroundColor`.",
-              "Repaint the left edge bar flat in the selection color.",
               "Re-tint the watermark to `selectedWatermarkColor`.",
               "Paint the label with `selectedTextColor`.",
               "Fill the pill behind the label with the selection color."
             ]
           },
-          "markdownDescription": "Which styles the selection color takes over. **Only what is listed changes on a selected row** — everything else keeps painting exactly as it does unselected.\n\n- `[\"edge\"]` — only the edge bar turns the selection color; the fill, watermark and label are untouched.\n- `[]` — selection changes nothing but the focus ring (`selectedBorder`, which is always its own setting).\n- Default `[\"background\", \"edge\", \"watermarks\", \"text-color\"]` — the row is filled, the bar and watermark are re-tinted to match, and the label takes `selectedTextColor`.\n\n`pills` is out of the default: a pill the selection has not taken over keeps its own fill and gains a traced edge, so an `invert` highlight painting the row in the pill color does not swallow it."
+          "markdownDescription": "Which styles the selection color takes over. **Only what is listed changes on a selected row** — everything else keeps painting exactly as it does unselected.\n\n- `[\"background\"]` — only the row fill turns the selection color; the watermark and label are untouched.\n- `[]` — selection changes nothing but the focus ring (`selectedBorder`, which is always its own setting).\n- Default `[\"background\", \"watermarks\", \"text-color\"]` — the row is filled, the watermark is re-tinted to match, and the label takes `selectedTextColor`.\n\nThe **edge bar is never taken over**: it is the one mark that still says which folder a selected or renaming row belongs to, so it always keeps its own colours.\n\n`pills` is out of the default: a pill the selection has not taken over keeps its own fill and gains a traced edge, so an `invert` highlight painting the row in the pill color does not swallow it."
         },
         "premiumExplorer.selectedWatermarkColor": {
           "anyOf": [

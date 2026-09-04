@@ -28,7 +28,8 @@
 
 	// Which styles the selection color takes over. Only what is named here changes
 	// on a selected row; everything else keeps painting exactly as it does
-	// unselected, so ["edge"] recolors just the edge bar and leaves the rest.
+	// unselected, so ["background"] recolors just the fill and leaves the rest.
+	// The edge bar is never in this set — it always keeps its own colours.
 	var OVERRIDES = SEL.overrides || [];
 	// How far a row being renamed shifts off the color it would otherwise paint —
 	// enough to register as a change, not enough to look like a different folder.
@@ -239,11 +240,30 @@
 	// one. The direction comes from `over`, not from `hex` itself, so a dark tint on
 	// a dark row lifts clear of it instead of sinking further in. Passing the same
 	// color as both is the common case — "a shade just off this" — which is how the
-	// selected watermark and the rename fill are picked.
+	// selected watermark is picked.
 	function nudge(hex, over, amount) {
 		amount = +amount || 0; // tolerate missing/invalid -> the color itself
 		var toward = luma(channels(over)) > 0.5 ? 0 : 255;
 		return toHex(channels(hex).map(function (v) { return v + (toward - v) * amount; }));
+	}
+
+	// How much of the folder's own color a lift pulls back in, relative to how far it
+	// steps. `nudge` alone cannot mark a row: it moves every channel the same distance
+	// toward white, which flattens the ratios *between* them — so a dark, saturated row
+	// arrives at grey, carrying none of the folder it belongs to. Pulling the fill back
+	// in first restores the hue that the step is about to wash out.
+	var LIFT_HUE = 3;
+
+	// The color a row lands on when it is marked — selected, or open for rename. Two
+	// moves, in this order: mix the folder's own color back into what the row already
+	// shows, then step the result clear of it. The mix is what keeps a selected row
+	// recognisably part of its folder instead of a grey band; the step is what makes it
+	// read as marked at all. With no fill of its own there is no hue to restore, so it
+	// degrades to the plain step.
+	function lift(shows, fill, amount) {
+		amount = +amount || 0;
+		var hued = fill ? mix(fill, shows, Math.min(1, amount * LIFT_HUE)) : shows;
+		return nudge(hued, shows, amount);
 	}
 
 	// The watermark re-tinted. Its color is baked into the SVG data URI at generate
@@ -464,7 +484,7 @@
 			// Focused: full color. Unfocused: darker, like VS Code's inactive selection.
 			var shifting = SEL.bg === "shift";
 			var selBase = !selected ? null
-				: shifting ? nudge(rowShows, rowShows, focused ? SEL.shift : SEL.shift * 0.45)
+				: shifting ? lift(rowShows, part ? part.solid : "", focused ? SEL.shift : SEL.shift * 0.45)
 				: SEL.bg === "invert" ? (part ? part.solid : null)
 				: SEL.bg;
 			var selFill = !selBase ? ""
@@ -528,11 +548,12 @@
 				if (taken("background")) { background = selFill; }
 				if (part.edge.image) {
 					layers.push({
-						// A taken-over edge is repainted flat in the selection color rather
-						// than removed, so the bar still marks the row.
-						image: taken("edge")
-							? "linear-gradient(" + selFill + "," + selFill + ")"
-							: (hover && part.edge.hover ? part.edge.hover : part.edge.image),
+						// The bar always keeps its own colours, selected and renaming included.
+						// It is the narrowest mark on the row and the one thing that says which
+						// folder the row belongs to; repainting it in the selection colour spent
+						// it on saying "selected", which the fill over the rest of the row
+						// already says.
+						image: hover && part.edge.hover ? part.edge.hover : part.edge.image,
 						size: part.edge.width + "px 100%",
 						repeat: "no-repeat",
 						position: "left top"
@@ -596,7 +617,7 @@
 			// edge bar are background *images*, so they paint over the shift and survive
 			// it intact. `active` gates it like every other layer: in a workspace
 			// premium-explorer has no rules for we paint nothing at all, rename included.
-			var editFill = editing && active ? nudge(rowShows, rowShows, EDIT_SHIFT) : "";
+			var editFill = editing && active ? lift(rowShows, part ? part.solid : "", EDIT_SHIFT) : "";
 			if (editFill) { background = editFill; }
 
 			setEditVars(row, editFill);
