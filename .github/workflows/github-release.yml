@@ -102,11 +102,11 @@ jobs:
           # Re-running a release (a failed publish, a re-tag) must not fail on an
           # existing release, so update it in place and overwrite the asset.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "Premium Explorer $TAG" "${notes_args[@]}"
+            gh release edit "$TAG" --title "$TAG" "${notes_args[@]}"
             gh release upload "$TAG" "$vsix" --clobber
           else
             gh release create "$TAG" "$vsix" \
-              --title "Premium Explorer $TAG" \
+              --title "$TAG" \
               --verify-tag \
               "${notes_args[@]}"
           fi
