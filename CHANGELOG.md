@@ -3,6 +3,30 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [1.3.0] - 2026-09-07
+
+### Added
+- **Watermark glyphs shipped in the box.** `premiumExplorer.backgroundWatermarkSymbol`
+  now accepts the bare name of an icon that comes with the extension — `ansible`,
+  `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform` —
+  so marking a folder as a Docker project no longer starts with going to find an
+  SVG. Names are matched case-insensitively and a trailing `.svg` is allowed, so
+  `docker`, `Docker` and `docker.svg` all mean the same drawing.
+
+  A glyph is tried *after* a file path, so a workspace's own `docker.svg` still
+  wins over the one in the box. A value that is neither a readable file nor a
+  glyph is drawn as text as before — its first two characters — but now says so
+  and lists the names available, instead of silently painting `do`.
+
+### Changed
+- **`backgroundWatermark` is now `backgroundWatermarkSymbol`**, as the global
+  setting and as the per-rule key, because it no longer takes only a character or
+  a path. The old names are still read wherever the new one is unset, so an
+  existing configuration keeps its artwork; both are marked deprecated in the
+  settings UI.
+- The extension's own logo moved from `images/` to `assets/logo/`, next to the
+  new `assets/svg/`.
+
 ## [1.2.3] - 2026-09-07
 
 No changes to the extension — identical to 1.2.2. Published to exercise the
