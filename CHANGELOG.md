@@ -3,6 +3,11 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [1.2.3] - 2026-09-07
+
+No changes to the extension — identical to 1.2.2. Published to exercise the
+release pipeline end to end.
+
 ## [1.2.2] - 2026-09-07
 
 ### Fixed
