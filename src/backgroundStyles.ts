@@ -21,6 +21,12 @@ const JS_FILE = 'premium-explorer.js';
 const OURS = [CSS_FILE, JS_FILE, 'premium-stash.css', 'premium-stash.js'];
 const CUSTOM_CSS_IMPORTS = 'vscode_custom_css.imports';
 
+// Watermark artwork shipped in the box, relative to the extension root. A file
+// dropped in here is addressable by its bare filename — `assets/svg/docker.svg`
+// is `backgroundWatermarkSymbol: "docker"` — with no code change; only the
+// examples in package.json's schema need updating so it autocompletes.
+const GLYPH_DIR = path.join('assets', 'svg');
+
 // The injected file is a single global file shared by every window, but rules are
 // per-workspace. We persist a union of each workspace's colored folders (keyed by
 // workspace-folder name) so opening another workspace doesn't inherit these colors
@@ -75,7 +81,7 @@ export async function writeBackgroundFiles(
 	// layers) and attribute each to the workspace folder that owns it, then merge
 	// into the persisted cross-workspace union so other workspaces' colors survive
 	// (and this workspace's stale ones are cleared).
-	const coloredFolders = await resolveColoredFolders(config);
+	const coloredFolders = await resolveColoredFolders(config, context.extensionUri.fsPath);
 	const thisWindow = groupByWorkspace(coloredFolders, bakeAll(coloredFolders));
 	const workspaces = mergeWorkspaceColors(context, thisWindow);
 
@@ -200,7 +206,7 @@ async function writeFiles(
  * and the merged root/inner layer configs). The injected script matches rows by
  * name, so two folders with the same name inside one workspace share a color.
  */
-async function resolveColoredFolders(config: FolderColorerConfig): Promise<ColoredFolder[]> {
+async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot: string): Promise<ColoredFolder[]> {
 	const byName = new Map<string, ColoredFolder>();
 
 	// Git repos discovered under `git` rules, unless a deeper (manual) rule governs
@@ -218,7 +224,7 @@ async function resolveColoredFolders(config: FolderColorerConfig): Promise<Color
 				const hex = gitRepoColorHex(config, repo);
 				byName.set(name, {
 					name, hex, absPath: repo.fsPath,
-					...identityOf(config, name, repo.fsPath, hex, rule.backgroundWatermark),
+					...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
 					...mergedParts(rule, config),
 				});
 			}
@@ -233,7 +239,7 @@ async function resolveColoredFolders(config: FolderColorerConfig): Promise<Color
 			const name = path.basename(rule.absPath);
 			byName.set(name, {
 				name, hex: config.defaultColor, absPath: rule.absPath,
-				...identityOf(config, name, rule.absPath, config.defaultColor, rule.backgroundWatermark),
+				...identityOf(config, name, rule.absPath, config.defaultColor, extensionRoot, rule.backgroundWatermarkSymbol),
 				...mergedParts(rule, config),
 			});
 		}
@@ -245,43 +251,116 @@ async function resolveColoredFolders(config: FolderColorerConfig): Promise<Color
 /**
  * A folder's identity extras: the unique colour sequence driving its striped edge
  * (first entry is the colour it already had, so nothing on screen shifts) and the
- * artwork for its watermark — the rule's `backgroundWatermark`, else the name's initial.
+ * artwork for its watermark — the rule's `backgroundWatermarkSymbol`, else the
+ * name's initial.
  */
-function identityOf(config: FolderColorerConfig, name: string, absPath: string, hex: string, watermark?: string): Pick<ColoredFolder, 'sequence' | 'art'> {
+function identityOf(
+	config: FolderColorerConfig,
+	name: string,
+	absPath: string,
+	hex: string,
+	extensionRoot: string,
+	watermark?: string,
+): Pick<ColoredFolder, 'sequence' | 'art'> {
 	const basis = config.colorBy === 'path' ? absPath : name;
-	const source = watermark || config.backgroundWatermark || (Array.from(name)[0] ?? '').toUpperCase();
+	const source = watermark || config.backgroundWatermarkSymbol || (Array.from(name)[0] ?? '').toUpperCase();
 	return {
 		sequence: paletteSequence(basis, config.palette, config.edgeColorCount, hex),
-		art: resolveWatermarkArt(source, absPath),
+		art: resolveWatermarkArt(source, absPath, extensionRoot),
 	};
 }
 
 /**
- * Turn a `backgroundWatermark` value into drawable artwork.
+ * Turn a `backgroundWatermarkSymbol` value into drawable artwork.
  *
- * A plain character is drawn as text. An SVG source — a path to an `.svg` file,
- * inline markup, or a data URI — is loaded and reduced to its inner markup, which
- * the pattern stamps once into `<defs>` and reuses for every copy. A path that
- * can't be read falls back to the folder's initial rather than painting nothing.
+ * An SVG source — a path to an `.svg` file, inline markup, or a data URI — is
+ * loaded and reduced to its inner markup, which the pattern stamps once into
+ * `<defs>` and reuses for every copy. A bare name is looked up against the glyphs
+ * shipped in `assets/svg`, so `docker` draws the whale without anyone having to
+ * find an icon first. Anything else is a character, drawn as text.
+ *
+ * The shipped glyphs are tried *after* a path, so a workspace's own `docker.svg`
+ * still wins over the one in the box.
  */
-function resolveWatermarkArt(source: string, absPath: string): WatermarkArt {
+function resolveWatermarkArt(source: string, absPath: string, extensionRoot: string): WatermarkArt {
 	const initial = (Array.from(path.basename(absPath))[0] ?? '?').toUpperCase();
-	if (!isSvgSource(source)) {
-		return { kind: 'watermark', content: source, key: source };
+	const isPath = isSvgSource(source);
+	let markup = '';
+	if (isPath) {
+		markup = source.startsWith('<svg') ? source
+			: source.startsWith('data:image/svg+xml') ? decodeSvgDataUri(source)
+				: readSvgFile(source, absPath);
 	}
-	let markup = source;
-	if (!source.startsWith('<svg')) {
-		markup = source.startsWith('data:image/svg+xml')
-			? decodeSvgDataUri(source)
-			: readSvgFile(source, absPath);
+	if (!markup) {
+		markup = builtinGlyph(source, extensionRoot);
 	}
 	const parsed = markup ? parseSvgMarkup(markup) : undefined;
-	if (!parsed) {
-		console.warn(`premium-explorer: could not load backgroundWatermark "${source}"`);
+	if (parsed) {
+		// Seed off the source, not the markup, so the scatter survives edits to the file.
+		return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, key: source };
+	}
+	if (isPath) {
+		console.warn(`premium-explorer: could not load backgroundWatermarkSymbol "${source}"`);
 		return { kind: 'watermark', content: initial, key: initial };
 	}
-	// Seed off the source, not the markup, so the scatter survives edits to the file.
-	return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, key: source };
+	// Not a drawing, so it is text. Two code points is all that fits legibly, and a
+	// longer value is a misspelt glyph name rather than something anyone wants drawn.
+	const text = Array.from(source).slice(0, 2).join('');
+	if (Array.from(source).length > 2) {
+		console.warn(`premium-explorer: backgroundWatermarkSymbol "${source}" is neither a readable .svg `
+			+ `nor a built-in glyph (${glyphNames(extensionRoot).join(', ') || 'none found'}); drawing "${text}".`);
+	}
+	return { kind: 'watermark', content: text || initial, key: text || initial };
+}
+
+/**
+ * The glyphs shipped with the extension, by lowercased name -> filename. Read once:
+ * this is asked per colored folder, and the set only changes when the extension is
+ * updated. Missing directory (a stripped build) = no built-ins, never an error.
+ */
+let glyphCache: { root: string; files: Map<string, string> } | undefined;
+function glyphCatalogue(extensionRoot: string): Map<string, string> {
+	if (glyphCache?.root !== extensionRoot) {
+		const dir = path.join(extensionRoot, GLYPH_DIR);
+		const files = new Map<string, string>();
+		try {
+			for (const file of fs.readdirSync(dir)) {
+				if (file.toLowerCase().endsWith('.svg')) {
+					files.set(file.slice(0, -4).toLowerCase(), path.join(dir, file));
+				}
+			}
+		} catch {
+			// No assets directory — every name falls through to the text watermark.
+		}
+		glyphCache = { root: extensionRoot, files };
+	}
+	return glyphCache.files;
+}
+
+/** Names the shipped glyphs answer to, for the warning that lists them. */
+function glyphNames(extensionRoot: string): string[] {
+	return [...glyphCatalogue(extensionRoot).keys()].sort();
+}
+
+/**
+ * Load a shipped glyph by name. Case-insensitive and a trailing `.svg` is allowed,
+ * so `docker`, `Docker` and `docker.svg` all name the same drawing. Anything
+ * carrying a path separator is a path, not a name, and never reaches here.
+ */
+function builtinGlyph(source: string, extensionRoot: string): string {
+	const name = source.trim().replace(/\.svg$/i, '').toLowerCase();
+	if (!/^[a-z0-9][a-z0-9._-]*$/.test(name)) {
+		return '';
+	}
+	const file = glyphCatalogue(extensionRoot).get(name);
+	if (!file) {
+		return '';
+	}
+	try {
+		return fs.readFileSync(file, 'utf8');
+	} catch {
+		return '';
+	}
 }
 
 /** Read an `.svg` file: absolute, `~`-relative, or relative to the folder it decorates. */

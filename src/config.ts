@@ -176,11 +176,12 @@ export interface ResolvedRule {
 	absPath: string;
 	engine: Engine;
 	/**
-	 * Artwork tiled behind this folder's rows: a character/emoji, or a path to an
+	 * Artwork tiled behind this folder's rows: the name of a glyph shipped in
+	 * `assets/svg` (`docker`, `terraform`, ...), a character/emoji, or a path to an
 	 * `.svg` file (also inline `<svg>` markup or a data URI). Falls back to the
-	 * global `backgroundWatermark`, then to the folder name's initial.
+	 * global `backgroundWatermarkSymbol`, then to the folder name's initial.
 	 */
-	backgroundWatermark?: string;
+	backgroundWatermarkSymbol?: string;
 	/** Per-rule layer overrides for the root row / inner rows (merged over the globals). */
 	root?: Partial<PartConfig>;
 	inner?: Partial<PartConfig>;
@@ -226,10 +227,11 @@ export interface FolderColorerConfig {
 	/** How many colours an auto-derived edge sequence uses (1 = a plain solid bar). */
 	edgeColorCount: number;
 	/**
-	 * Default artwork for the watermark: a character/emoji, or a path to an
-	 * `.svg` file. Empty = each folder uses the first letter of its own name.
+	 * Default artwork for the watermark: a built-in glyph name, a character/emoji,
+	 * or a path to an `.svg` file. Empty = each folder uses the first letter of
+	 * its own name.
 	 */
-	backgroundWatermark: string;
+	backgroundWatermarkSymbol: string;
 	/** Global default layers for the repo root row and the inner rows. */
 	root: PartConfig;
 	inner: PartConfig;
@@ -352,7 +354,11 @@ export function readConfig(): FolderColorerConfig {
 		palette: resolvePalette(cfg),
 		defaultColor,
 		edgeColorCount: cfg.get<number>('edgeColorCount', 3),
-		backgroundWatermark: readWatermarkSource(cfg.get<string>('backgroundWatermark', '')) ?? '',
+		// `backgroundWatermark` is the pre-1.3 name, still read so an existing config
+		// keeps its artwork; the new key wins wherever both are set.
+		backgroundWatermarkSymbol: readWatermarkSource(
+			cfg.get<string>('backgroundWatermarkSymbol', '') || cfg.get<string>('backgroundWatermark', ''),
+		) ?? '',
 		root: readPart(get, 'root', ROOT_DEFAULTS),
 		inner: readPart(get, 'inner', INNER_DEFAULTS),
 		selection: {
@@ -417,10 +423,10 @@ function resolveRules(cfg: vscode.WorkspaceConfiguration): ResolvedRule[] {
 
 		const root = readPartOverride(entry, 'root');
 		const inner = readPartOverride(entry, 'inner');
-		const watermark = readWatermarkSource(entry.backgroundWatermark);
+		const watermark = readWatermarkSource(entry.backgroundWatermarkSymbol ?? entry.backgroundWatermark);
 
 		for (const absPath of resolveRulePaths(entry.path, folders)) {
-			resolved.push({ absPath, engine, backgroundWatermark: watermark, root, inner });
+			resolved.push({ absPath, engine, backgroundWatermarkSymbol: watermark, root, inner });
 		}
 	}
 
@@ -443,22 +449,16 @@ function watermarkColorOrUndefined(raw: unknown): string | undefined {
 export const WATERMARK_COLOR_ORIGINAL = 'original';
 
 /**
- * Read a `backgroundWatermark` value. A character or emoji is capped at two chars, but
- * an SVG source — a `.svg` path, inline markup, or a data URI — is kept whole so
- * it can be loaded and drawn (see resolveWatermarkArt in backgroundStyles.ts).
+ * Read a `backgroundWatermarkSymbol` value. Kept whole: deciding what it *is* —
+ * a built-in glyph, an SVG source, or a character to draw — needs the shipped
+ * assets and the filesystem, so it belongs to resolveWatermarkArt in
+ * backgroundStyles.ts. That is also where a character is capped at two.
  */
 function readWatermarkSource(raw: unknown): string | undefined {
-	if (typeof raw !== 'string') {
-		return undefined;
-	}
-	const value = raw.trim();
-	if (!value) {
-		return undefined;
-	}
-	return isSvgSource(value) ? value : value.slice(0, 2);
+	return typeof raw === 'string' ? raw.trim() || undefined : undefined;
 }
 
-/** Does this `backgroundWatermark` name a drawing rather than a character? */
+/** Does this `backgroundWatermarkSymbol` name a drawing rather than a character? */
 export function isSvgSource(value: string): boolean {
 	return /\.svg$/i.test(value) || value.startsWith('<svg') || value.startsWith('data:image/svg+xml');
 }

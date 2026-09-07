@@ -1,10 +1,10 @@
 {
   "name": "premium-explorer",
   "publisher": "pepsik",
-  "icon": "images/logo-512.png",
+  "icon": "assets/logo/logo-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -396,7 +396,7 @@
                   "Scatter the folder's watermark faintly behind the row.",
                   "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
                 ],
-                "markdownDescription": "**Watermark** layer for the repo root row: artwork scattered faintly behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+                "markdownDescription": "**Watermark** layer for the repo root row: artwork scattered faintly behind the row (the rule's `backgroundWatermarkSymbol`, else the folder name's initial)."
               },
               "rootWatermarkColor": {
                 "anyOf": [
@@ -485,7 +485,7 @@
                   "Scatter the folder's watermark faintly behind the row.",
                   "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
                 ],
-                "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): artwork scattered faintly behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+                "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): artwork scattered faintly behind the row (the rule's `backgroundWatermarkSymbol`, else the folder name's initial)."
               },
               "innerWatermarkColor": {
                 "anyOf": [
@@ -572,9 +572,27 @@
                 "maximum": 1,
                 "markdownDescription": "0-1 — how much the rows inside a colored folder watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `innerWatermarkRotation`."
               },
+              "backgroundWatermarkSymbol": {
+                "type": "string",
+                "examples": [
+                  "ansible",
+                  "argo",
+                  "claude",
+                  "docker",
+                  "fluxcd",
+                  "git",
+                  "kubernetes",
+                  "pulumi",
+                  "terraform",
+                  "🐳",
+                  "./.vscode/whale.svg"
+                ],
+                "markdownDescription": "Watermark artwork for this rule's folder, tiled faintly behind the rows. Overrides `premiumExplorer.backgroundWatermarkSymbol`.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work."
+              },
               "backgroundWatermark": {
                 "type": "string",
-                "markdownDescription": "Character/emoji, or a path to an `.svg` file, tiled faintly behind the rows — e.g. `🐳`, `⚙`, `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root. Inline `<svg>` markup and `data:image/svg+xml` URIs also work. Overrides `premiumExplorer.backgroundWatermark` for this rule."
+                "markdownDeprecationMessage": "Renamed to `backgroundWatermarkSymbol`, which also takes the name of a glyph shipped with the extension. Still read while that one is unset.",
+                "markdownDescription": "Old name for `backgroundWatermarkSymbol`."
               },
               "rootWatermarkRotation": {
                 "type": "number",
@@ -802,7 +820,7 @@
             "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
           ],
           "default": "none",
-          "markdownDescription": "**Watermark** layer for the repo root row: a faint tiled watermark behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+          "markdownDescription": "**Watermark** layer for the repo root row: a faint tiled watermark behind the row (the rule's `backgroundWatermarkSymbol`, else the folder name's initial)."
         },
         "premiumExplorer.rootWatermarkColor": {
           "anyOf": [
@@ -1054,7 +1072,7 @@
             "Reuse whatever the nearest **enclosing** colored folder paints on its inner rows."
           ],
           "default": "inherit",
-          "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): a faint tiled watermark behind the row (the rule's `backgroundWatermark`, else the folder name's initial)."
+          "markdownDescription": "**Watermark** layer for the inner rows (files/folders inside): a faint tiled watermark behind the row (the rule's `backgroundWatermarkSymbol`, else the folder name's initial)."
         },
         "premiumExplorer.innerWatermarkColor": {
           "anyOf": [
@@ -1281,10 +1299,29 @@
           "maximum": 1,
           "markdownDescription": "How much darker the selected row becomes when the Explorer is **not** focused (0 = same color, 1 = black). The border is also dropped while unfocused, mirroring VS Code’s inactive selection."
         },
+        "premiumExplorer.backgroundWatermarkSymbol": {
+          "type": "string",
+          "default": "",
+          "examples": [
+            "ansible",
+            "argo",
+            "claude",
+            "docker",
+            "fluxcd",
+            "git",
+            "kubernetes",
+            "pulumi",
+            "terraform",
+            "🐳",
+            "./.vscode/whale.svg"
+          ],
+          "markdownDescription": "Default watermark artwork for every colored folder, tiled faintly behind the rows.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`. Only the first two characters are drawn, so a longer word that is not a glyph name is almost certainly a typo.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work.\n\nEmpty = each folder uses the first letter of its own name. Whether it is *drawn* is up to `#premiumExplorer.rootWatermarkStyle#` / `#premiumExplorer.innerWatermarkStyle#`."
+        },
         "premiumExplorer.backgroundWatermark": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Default watermark artwork for every colored folder. Character/emoji, or a path to an `.svg` file, tiled faintly behind the rows — e.g. `🐳`, `⚙`, `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root. Inline `<svg>` markup and `data:image/svg+xml` URIs also work. Empty = each folder uses the first letter of its own name. Whether it is *drawn* is up to `rootWatermarkStyle` / `innerWatermarkStyle`."
+          "markdownDeprecationMessage": "Renamed to `#premiumExplorer.backgroundWatermarkSymbol#`, which also takes the name of a glyph shipped with the extension. Still read while that one is unset.",
+          "markdownDescription": "Old name for `#premiumExplorer.backgroundWatermarkSymbol#`."
         },
         "premiumExplorer.rootWatermarkCanvas": {
           "type": "number",

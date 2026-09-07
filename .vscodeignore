@@ -17,8 +17,8 @@ vsc-extension-quickstart.md
 pnpm-lock.yaml
 pnpm-workspace.yaml
 .npmrc
-images/logo.svg
-images/logo-128.png
+assets/logo/logo.svg
+assets/logo/logo-128.png
 dist/*.svg
 dist/out/**
 .claude/**

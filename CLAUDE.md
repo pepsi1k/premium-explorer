@@ -105,6 +105,25 @@ default) and `readPartOverride()` (per-rule override) in
 [config.ts](src/config.ts) — then whatever consumes it in
 [layers.ts](src/layers.ts) and [media/inject.js](media/inject.js).
 
+### Adding a built-in watermark glyph
+
+`premiumExplorer.backgroundWatermarkSymbol` (and the per-rule key of the same
+name) accepts the bare name of any `.svg` in [assets/svg/](assets/svg/) —
+`docker`, `terraform`, … `resolveWatermarkArt()` in
+[backgroundStyles.ts](src/backgroundStyles.ts) scans that directory at generate
+time, so **dropping a file in is the whole code change**. Two things to know:
+
+- The name list in `contributes.configuration` is hand-written and does *not*
+  update itself. Add the new name to `examples` and to the "built-in glyph"
+  sentence in both `premiumExplorer.backgroundWatermarkSymbol` and the rule-level
+  `backgroundWatermarkSymbol`, or it won't autocomplete.
+- A glyph is tried **after** a path, so a workspace's own `docker.svg` still wins.
+  A value that resolves to neither is drawn as text (first two characters), which
+  is why a misspelt name warns instead of silently painting `do`.
+- `neutralizeSvg()` strips the artwork's own fills so it takes one flat tint,
+  including the `<style>` classes an Illustrator export uses. An icon that draws
+  only with `fill="none"` outlines is the case that needs checking by eye.
+
 ## Gotchas
 
 - **[README.md](README.md) is stale.** Its Settings section still describes the
