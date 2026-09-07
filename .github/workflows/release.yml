@@ -51,46 +51,10 @@ jobs:
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          vsix="dist/out/premium-explorer-${VERSION}.vsix"
+          vsix="dist/out/premium-explorer-${{ steps.version.outputs.version }}.vsix"
           test -f "$vsix" || { echo "::error::$vsix not found"; ls -la dist/out; exit 1; }
-
-          # The gallery times out often enough to matter, and a version can never be
-          # republished — so a dropped connection must not be allowed to burn one.
-          # Two things make a retry safe:
-          #   * the asset probe below, because a timeout can drop the response *after*
-          #     the upload was accepted, and publishing again would then be rejected;
-          #   * treating "already exists" as success, for the same reason, in case the
-          #     accepted version isn't downloadable yet while it validates.
-          asset="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/pepsik/vsextensions/premium-explorer/${VERSION}/vspackage"
-
-          for attempt in 1 2 3; do
-            echo "::group::vsce publish (attempt $attempt/3)"
-            out="$(pnpm exec vsce publish --packagePath "$vsix" 2>&1)" && status=0 || status=$?
-            echo "$out"
-            echo "::endgroup::"
-
-            if [ "$status" -eq 0 ]; then
-              echo "Published $VERSION."
-              exit 0
-            fi
-            if printf '%s' "$out" | grep -qiE 'already exists|duplicate'; then
-              echo "::notice::$VERSION was already accepted; treating as published."
-              exit 0
-            fi
-            if curl -sfL -o /dev/null --max-time 30 "$asset"; then
-              echo "::notice::$VERSION is downloadable despite the error; not retrying."
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Publish attempt $attempt failed and $VERSION is not in the gallery; retrying in 60s."
-              sleep 60
-            fi
-          done
-
-          echo "::error::vsce publish failed 3 times and $VERSION never reached the gallery."
-          exit 1
+          pnpm exec vsce publish --packagePath "$vsix"
 
       - name: Wait for Marketplace validation
         id: validate
@@ -122,13 +86,7 @@ jobs:
           VALIDATION: ${{ steps.validate.outcome }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            # A warning, not a notice: silence here looks exactly like a release that
-            # went fine, which is the one thing a notification exists to rule out.
-            # Report only whether each is set, never any part of the value: this is
-            # written straight into a public build log.
-            have_token=no; [ -n "$TELEGRAM_BOT_TOKEN" ] && have_token=yes
-            have_chat=no;  [ -n "$TELEGRAM_CHAT_ID" ]  && have_chat=yes
-            echo "::warning::Telegram secrets missing (token set: $have_token, chat set: $have_chat) — no notification sent."
+            echo "::notice::Telegram secrets not configured, skipping notification."
             exit 0
           fi
 
@@ -153,51 +111,9 @@ jobs:
           <a href=\"$run_url\">See the workflow run</a>"
           fi
 
-          # A pasted secret picks up newlines more often than anything else here, and
-          # they survive into the URL path.
-          token="$(printf '%s' "$TELEGRAM_BOT_TOKEN" | tr -d '[:space:]')"
-          chat="$(printf '%s' "$TELEGRAM_CHAT_ID" | tr -d '[:space:]')"
-
-          # A real token is "<id>:<hash>". The URL below already supplies the "bot"
-          # prefix, so a secret carrying one too gives /botbot<id>:<hash>/ — a 404
-          # that reads exactly like a revoked token.
-          case "$token" in
-            bot*) echo "::warning::TELEGRAM_BOT_TOKEN begins with 'bot'. The URL adds that prefix itself; the secret should be just '<id>:<hash>'." ;;
-          esac
-
-          # Telegram routes on the token in the URL path and answers with three codes
-          # that need three different fixes — verified against the live API:
-          #   404 "Not Found"    the value is not token-shaped at all: a "bot" prefix,
-          #                      surrounding quotes, a truncated paste with no colon.
-          #   401 "Unauthorized" well-formed <id>:<hash>, but no such bot — revoked, or
-          #                      the token of a bot that was deleted.
-          #   400 "chat not..."  token fine, TELEGRAM_CHAT_ID wrong.
-          # Ask getMe first so the log names which of the three it is, instead of
-          # leaving a bare HTTP code that reads like a dead endpoint.
-          if ! me="$(curl -sS --fail-with-body --max-time 30 \
-            "https://api.telegram.org/bot${token}/getMe" 2>&1)"; then
-            echo "::warning::Telegram does not recognise TELEGRAM_BOT_TOKEN — the release itself was unaffected."
-            echo "::warning::getMe said: $me"
-            case "$me" in
-              *404*) echo "::warning::404 means the secret is not token-shaped. Check for a leading 'bot', surrounding quotes, or a truncated paste — it must be exactly '<id>:<hash>'. Reissuing the token will NOT help." ;;
-              *401*) echo "::warning::401 means the value is well-formed but no such bot exists — revoked or deleted. Reissue with BotFather /token." ;;
-              *)     echo "::warning::Unexpected getMe failure; the release itself is unaffected." ;;
-            esac
-            exit 0
-          fi
-          echo "Authenticated as: $(printf '%s' "$me" | grep -o '"username":"[^"]*"' || echo 'unknown')"
-
-          # `continue-on-error` on this step means a send failure is invisible unless
-          # the response is printed: a bot that has never been messaged by the target
-          # chat, or a wrong id, comes back as 400 with a description saying which.
-          if ! response="$(curl -sS --fail-with-body \
-            -X POST "https://api.telegram.org/bot${token}/sendMessage" \
-            --data-urlencode "chat_id=${chat}" \
+          curl -sS --fail-with-body -o /dev/null \
+            -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${text}" \
             --data-urlencode "parse_mode=HTML" \
-            --data-urlencode "disable_web_page_preview=true" 2>&1)"; then
-            echo "::warning::Telegram accepted the token but rejected the message: $response"
-            echo "::warning::Check TELEGRAM_CHAT_ID — and note a bot can only message a chat it has already been added to or messaged from."
-            exit 0
-          fi
-          echo "Notification sent." 
+            --data-urlencode "disable_web_page_preview=true"
