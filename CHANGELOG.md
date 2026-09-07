@@ -3,7 +3,7 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
-## [1.2.1] - 2026-09-07
+## [1.2.2] - 2026-09-07
 
 ### Fixed
 - **Selection colours are now per-workspace, like the folder colours already were.**

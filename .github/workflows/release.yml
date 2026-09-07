@@ -51,10 +51,46 @@ jobs:
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          vsix="dist/out/premium-explorer-${{ steps.version.outputs.version }}.vsix"
+          vsix="dist/out/premium-explorer-${VERSION}.vsix"
           test -f "$vsix" || { echo "::error::$vsix not found"; ls -la dist/out; exit 1; }
-          pnpm exec vsce publish --packagePath "$vsix"
+
+          # The gallery times out often enough to matter, and a version can never be
+          # republished — so a dropped connection must not be allowed to burn one.
+          # Two things make a retry safe:
+          #   * the asset probe below, because a timeout can drop the response *after*
+          #     the upload was accepted, and publishing again would then be rejected;
+          #   * treating "already exists" as success, for the same reason, in case the
+          #     accepted version isn't downloadable yet while it validates.
+          asset="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/pepsik/vsextensions/premium-explorer/${VERSION}/vspackage"
+
+          for attempt in 1 2 3; do
+            echo "::group::vsce publish (attempt $attempt/3)"
+            out="$(pnpm exec vsce publish --packagePath "$vsix" 2>&1)" && status=0 || status=$?
+            echo "$out"
+            echo "::endgroup::"
+
+            if [ "$status" -eq 0 ]; then
+              echo "Published $VERSION."
+              exit 0
+            fi
+            if printf '%s' "$out" | grep -qiE 'already exists|duplicate'; then
+              echo "::notice::$VERSION was already accepted; treating as published."
+              exit 0
+            fi
+            if curl -sfL -o /dev/null --max-time 30 "$asset"; then
+              echo "::notice::$VERSION is downloadable despite the error; not retrying."
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Publish attempt $attempt failed and $VERSION is not in the gallery; retrying in 60s."
+              sleep 60
+            fi
+          done
+
+          echo "::error::vsce publish failed 3 times and $VERSION never reached the gallery."
+          exit 1
 
       - name: Wait for Marketplace validation
         id: validate
@@ -86,7 +122,13 @@ jobs:
           VALIDATION: ${{ steps.validate.outcome }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::notice::Telegram secrets not configured, skipping notification."
+            # A warning, not a notice: silence here looks exactly like a release that
+            # went fine, which is the one thing a notification exists to rule out.
+            # Report only whether each is set, never any part of the value: this is
+            # written straight into a public build log.
+            have_token=no; [ -n "$TELEGRAM_BOT_TOKEN" ] && have_token=yes
+            have_chat=no;  [ -n "$TELEGRAM_CHAT_ID" ]  && have_chat=yes
+            echo "::warning::Telegram secrets missing (token set: $have_token, chat set: $have_chat) — no notification sent."
             exit 0
           fi
 
@@ -111,9 +153,16 @@ jobs:
           <a href=\"$run_url\">See the workflow run</a>"
           fi
 
-          curl -sS --fail-with-body -o /dev/null \
+          # `continue-on-error` on this step means a failure here is invisible unless
+          # the response is printed: Telegram answers a bad token or chat id with a
+          # 400 and a description saying which.
+          if ! response="$(curl -sS --fail-with-body \
             -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${text}" \
             --data-urlencode "parse_mode=HTML" \
-            --data-urlencode "disable_web_page_preview=true"
+            --data-urlencode "disable_web_page_preview=true" 2>&1)"; then
+            echo "::warning::Telegram rejected the notification: $response"
+            exit 0
+          fi
+          echo "Notification sent." 
