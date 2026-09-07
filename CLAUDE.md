@@ -78,10 +78,15 @@ stripe gradients, and the SVG watermark pattern generator.
   shallowest-first; `NO_ANCESTOR_FALLBACK` covers a top-level folder.
 - **Folders are matched by *name*, not path, in the browser.** The DOM has no
   paths. Two same-named folders in one workspace therefore share a color.
-- **One global file, per-workspace colors.** The injected file is shared by every
-  window, so `globalState` (`premiumExplorer.workspaceColors`) holds a union keyed
-  by lowercased workspace-folder name; `inject.js` paints only the map(s) for the
+- **One global file, per-workspace colors *and* selection.** The injected file is
+  shared by every window, so `globalState` holds two unions keyed by lowercased
+  workspace-folder name — `premiumExplorer.workspaceColors` and
+  `premiumExplorer.workspaceSelection`; `inject.js` paints only the map(s) for the
   workspace in the current window and sets `body.fc-active` to gate the CSS.
+  Anything baked once for the whole file is decided by whichever window generated
+  last, which is a bug every time the setting behind it is per-workspace. That is
+  why the generated CSS holds no colors: the selected label's color travels as
+  `--fc-sel-fg` on rows the painter marked `.fc-sel-text`/`.fc-sel-bold`.
 - **The Explorer list is virtualized and flat.** `inject.js` reconstructs the tree
   by sorting rows on `style.top` and walking `aria-level` with a stack.
 - **Only touch rows we own.** Every write in `inject.js` is inline and tracked via

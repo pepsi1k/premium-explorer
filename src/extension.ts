@@ -9,7 +9,7 @@
 import * as vscode from 'vscode';
 import { CONFIG_SECTION, readConfig } from './config';
 import { FolderColorerProvider } from './decorationProvider';
-import { generateBackgroundCss, regenerateIfConfigured } from './backgroundStyles';
+import { generateBackgroundCss, regenerateIfConfigured, regenerateIfStale } from './backgroundStyles';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	let config = readConfig();
@@ -46,6 +46,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		// Relative rule paths resolve against the open folders, so re-read on change.
 		vscode.workspace.onDidChangeWorkspaceFolders(() => void reload(true)),
 	);
+
+	// An update ships a new painter that nothing would otherwise install — the
+	// generated files embed it verbatim and are only rewritten on a settings change.
+	void regenerateIfStale(context, config);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
