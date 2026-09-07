@@ -153,16 +153,42 @@ jobs:
           <a href=\"$run_url\">See the workflow run</a>"
           fi
 
-          # `continue-on-error` on this step means a failure here is invisible unless
-          # the response is printed: Telegram answers a bad token or chat id with a
-          # 400 and a description saying which.
+          # A pasted secret picks up newlines more often than anything else here, and
+          # they survive into the URL path.
+          token="$(printf '%s' "$TELEGRAM_BOT_TOKEN" | tr -d '[:space:]')"
+          chat="$(printf '%s' "$TELEGRAM_CHAT_ID" | tr -d '[:space:]')"
+
+          # A real token is "<id>:<hash>". The URL below already supplies the "bot"
+          # prefix, so a secret carrying one too gives /botbot<id>:<hash>/ — a 404
+          # that reads exactly like a revoked token.
+          case "$token" in
+            bot*) echo "::warning::TELEGRAM_BOT_TOKEN begins with 'bot'. The URL adds that prefix itself; the secret should be just '<id>:<hash>'." ;;
+          esac
+
+          # Telegram routes on the token in the URL path, so an unrecognised token is a
+          # 404 while a valid token with a bad chat id is a 400 "chat not found" — two
+          # very different fixes behind two indistinguishable-looking failures. Ask
+          # getMe first so the log names which one it is.
+          if ! me="$(curl -sS --fail-with-body --max-time 30 \
+            "https://api.telegram.org/bot${token}/getMe" 2>&1)"; then
+            echo "::warning::Telegram does not recognise TELEGRAM_BOT_TOKEN — the release itself was unaffected."
+            echo "::warning::getMe said: $me"
+            echo "::warning::404 = no such token (revoked or mistyped; reissue via BotFather /token). 401 = malformed."
+            exit 0
+          fi
+          echo "Authenticated as: $(printf '%s' "$me" | grep -o '"username":"[^"]*"' || echo 'unknown')"
+
+          # `continue-on-error` on this step means a send failure is invisible unless
+          # the response is printed: a bot that has never been messaged by the target
+          # chat, or a wrong id, comes back as 400 with a description saying which.
           if ! response="$(curl -sS --fail-with-body \
-            -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            --data-urlencode "chat_id=${chat}" \
             --data-urlencode "text=${text}" \
             --data-urlencode "parse_mode=HTML" \
             --data-urlencode "disable_web_page_preview=true" 2>&1)"; then
-            echo "::warning::Telegram rejected the notification: $response"
+            echo "::warning::Telegram accepted the token but rejected the message: $response"
+            echo "::warning::Check TELEGRAM_CHAT_ID — and note a bot can only message a chat it has already been added to or messaged from."
             exit 0
           fi
           echo "Notification sent." 
