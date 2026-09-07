@@ -165,15 +165,24 @@ jobs:
             bot*) echo "::warning::TELEGRAM_BOT_TOKEN begins with 'bot'. The URL adds that prefix itself; the secret should be just '<id>:<hash>'." ;;
           esac
 
-          # Telegram routes on the token in the URL path, so an unrecognised token is a
-          # 404 while a valid token with a bad chat id is a 400 "chat not found" — two
-          # very different fixes behind two indistinguishable-looking failures. Ask
-          # getMe first so the log names which one it is.
+          # Telegram routes on the token in the URL path and answers with three codes
+          # that need three different fixes — verified against the live API:
+          #   404 "Not Found"    the value is not token-shaped at all: a "bot" prefix,
+          #                      surrounding quotes, a truncated paste with no colon.
+          #   401 "Unauthorized" well-formed <id>:<hash>, but no such bot — revoked, or
+          #                      the token of a bot that was deleted.
+          #   400 "chat not..."  token fine, TELEGRAM_CHAT_ID wrong.
+          # Ask getMe first so the log names which of the three it is, instead of
+          # leaving a bare HTTP code that reads like a dead endpoint.
           if ! me="$(curl -sS --fail-with-body --max-time 30 \
             "https://api.telegram.org/bot${token}/getMe" 2>&1)"; then
             echo "::warning::Telegram does not recognise TELEGRAM_BOT_TOKEN — the release itself was unaffected."
             echo "::warning::getMe said: $me"
-            echo "::warning::404 = no such token (revoked or mistyped; reissue via BotFather /token). 401 = malformed."
+            case "$me" in
+              *404*) echo "::warning::404 means the secret is not token-shaped. Check for a leading 'bot', surrounding quotes, or a truncated paste — it must be exactly '<id>:<hash>'. Reissuing the token will NOT help." ;;
+              *401*) echo "::warning::401 means the value is well-formed but no such bot exists — revoked or deleted. Reissue with BotFather /token." ;;
+              *)     echo "::warning::Unexpected getMe failure; the release itself is unaffected." ;;
+            esac
             exit 0
           fi
           echo "Authenticated as: $(printf '%s' "$me" | grep -o '"username":"[^"]*"' || echo 'unknown')"
