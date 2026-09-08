@@ -3,7 +3,7 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
-## [1.3.0] - 2026-09-07
+## [1.4.0] - 2026-09-08
 
 ### Added
 - **Watermark glyphs shipped in the box.** `premiumExplorer.backgroundWatermarkSymbol`
