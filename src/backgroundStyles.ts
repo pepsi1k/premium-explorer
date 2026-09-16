@@ -14,6 +14,7 @@ import { WatermarkArt, paletteSequence, parseSvgMarkup } from './colors';
 import { ColoredFolder, Part, buildPart } from './layers';
 import { LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig, FolderColorerConfig, ResolvedRule, deepestRuleFor, gitRepoColorHex, isSvgSource, WATERMARK_COLOR_ORIGINAL } from './config';
 import { findRepositories } from './repositoryScanner';
+import { inspect as inspectWorkbench, mirror as mirrorWorkbench } from './workbenchPatch';
 
 const CSS_FILE = 'premium-explorer.css';
 const JS_FILE = 'premium-explorer.js';
@@ -186,7 +187,15 @@ function mergeWorkspaceSelection(
 	return union;
 }
 
-/** Write the CSS + JS into global storage and return their URIs. */
+/**
+ * Write the CSS + JS into global storage and return their URIs.
+ *
+ * Global storage stays the source of truth: it is what a vscode-custom-css setup
+ * imports, and what the workbench patch copies from. Refreshing the patched copy
+ * here means every caller that regenerates — a settings change, an extension
+ * update, the command run by hand — keeps whichever consumer is live in step
+ * without having to know which one that is.
+ */
 async function writeFiles(
 	context: vscode.ExtensionContext,
 	css: string,
@@ -198,7 +207,27 @@ async function writeFiles(
 	const jsUri = vscode.Uri.joinPath(context.globalStorageUri, JS_FILE);
 	await vscode.workspace.fs.writeFile(cssUri, Buffer.from(css, 'utf8'));
 	await vscode.workspace.fs.writeFile(jsUri, Buffer.from(js, 'utf8'));
+	mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath);
 	return { cssUri, jsUri, count };
+}
+
+/**
+ * Refresh the patched workbench's copy of the pair, if we are the one painting.
+ *
+ * Deliberately silent on failure. Regenerating has to keep working for someone on
+ * the vscode-custom-css path, and a patch that a VS Code update has wiped is worth
+ * one prompt on activation — not a warning every time a setting moves.
+ */
+function mirrorToWorkbench(css: string, js: string): void {
+	const status = inspectWorkbench();
+	if (status.state !== 'patched') {
+		return;
+	}
+	try {
+		mirrorWorkbench(status.workbench, { css, js });
+	} catch {
+		// Surfaced by the activation check and the enable command instead.
+	}
 }
 
 /**

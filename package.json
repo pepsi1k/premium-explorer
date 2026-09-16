@@ -40,8 +40,16 @@
         "title": "Premium Explorer: Refresh Decorations"
       },
       {
+        "command": "premium-explorer.enableInjection",
+        "title": "Premium Explorer: Enable Background Painting"
+      },
+      {
+        "command": "premium-explorer.disableInjection",
+        "title": "Premium Explorer: Disable Background Painting (Restore Workbench)"
+      },
+      {
         "command": "premium-explorer.generateBackgroundCss",
-        "title": "Premium Explorer: Generate Background CSS (vscode-custom-css)"
+        "title": "Premium Explorer: Generate Background CSS (for vscode-custom-css)"
       }
     ],
     "configuration": {

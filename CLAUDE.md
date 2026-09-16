@@ -36,9 +36,14 @@ generated sample.
 The extension paints almost nothing itself. VS Code's `FileDecorationProvider`
 can only set a badge/tooltip on a label — there is no API for row backgrounds —
 so the real output is a **generated CSS + JS pair** written into the extension's
-`globalStorageUri` and injected into the workbench by the third-party
-`be5invis.vscode-custom-css` extension. Nothing renders until the user runs
-**Premium Explorer: Generate Background CSS**, enables custom CSS, and reloads.
+`globalStorageUri` and loaded by the workbench. Nothing renders until the user
+turns painting on and reloads.
+
+There are two ways that pair reaches the workbench, and both are supported:
+[workbenchPatch.ts](src/workbenchPatch.ts) patching `workbench.html` ourselves
+(**Premium Explorer: Enable Background Painting**), or the third-party
+`be5invis.vscode-custom-css` (**Generate Background CSS**). They must not both be
+active — two copies of the script paint every row twice.
 
 Generate-time pipeline, all triggered from
 [extension.ts](src/extension.ts) on activation, settings change, workspace-folder
@@ -61,11 +66,14 @@ change, or a `**/.git` watcher event:
    **prepended verbatim** to the static [media/inject.js](media/inject.js), which
    is written alongside a small CSS file (the CSS covers only what inline styles
    can't reach: the selected label and the inline rename box).
-5. `addCustomCssImports()` rewrites `vscode_custom_css.imports` to point at the
-   two files.
+5. The pair is delivered: `writeFiles()` mirrors it into the patched workbench
+   directory when we own the patch, and `addCustomCssImports()` rewrites
+   `vscode_custom_css.imports` when the user is on that path instead.
 
-[colors.ts](src/colors.ts) is pure (no `vscode` import): hashing, hex/rgba math,
-stripe gradients, and the SVG watermark pattern generator.
+[colors.ts](src/colors.ts) and [workbenchPatch.ts](src/workbenchPatch.ts) are pure
+(no `vscode` import): the first does hashing, hex/rgba math, stripe gradients and
+the SVG watermark pattern; the second does the file surgery on `workbench.html`,
+with every message and prompt left to [injection.ts](src/injection.ts).
 
 ### Invariants worth preserving
 
@@ -92,9 +100,18 @@ stripe gradients, and the SVG watermark pattern generator.
 - **Only touch rows we own.** Every write in `inject.js` is inline and tracked via
   a `data-fc-*` marker, both to avoid `MutationObserver` write loops and to never
   clear styling that isn't ours.
-- **`premiumExplorer.enabled: false` must write inert files.** vscode-custom-css
-  loads the generated pair independently of the extension, so disabling has to
-  actively blank them or the last-generated colors keep painting.
+- **`premiumExplorer.enabled: false` must write inert files.** The workbench loads
+  the generated pair independently of the extension — whether by our patch or by
+  vscode-custom-css — so disabling has to actively blank them, or the
+  last-generated colors keep painting.
+- **The workbench patch names files; it never carries them.** The tags injected
+  into `workbench.html` reference `./premium-explorer.{css,js}` in the same
+  directory, so regenerating means rewriting those two files (`writeFiles()` does
+  it) and the HTML is never revisited. That is also what keeps VS Code's CSP
+  intact: a relative `src` is `'self'`, which `script-src` already allows, so
+  unlike vscode-custom-css we don't have to delete the policy to inline a script.
+  Keep `media/inject.js` free of `innerHTML`-style sinks or the CSP's
+  `require-trusted-types-for 'script'` will start blocking the painter.
 
 ### Adding a layer setting
 

@@ -36,32 +36,76 @@ With **no rules configured, nothing is colored** — you opt in per path.
 
 Paths may be **workspace-relative** (`.`, `./projects`) or **absolute**.
 
-## What gets colored: labels vs. backgrounds
+## How it works
 
-Out of the box the extension tints Explorer **label text**. This is the only kind
-of Explorer styling the VS Code API allows — there is **no API to set row
-background colors**. (Because `FileDecoration` can only reference a registered
-`ThemeColor`, the extension bridges any custom hex into `workbench.colorCustomizations`
-for you.)
+VS Code has **no API for Explorer row backgrounds**. Through `FileDecorationProvider`
+an extension can set a label's badge and tooltip, and nothing else — and extensions
+run in a separate process from the window you see, so none of them can reach the
+workbench DOM directly.
 
-To also color row **backgrounds**, see below.
+Premium Explorer therefore works in two halves:
 
-## Background coloring (optional, via vscode-custom-css)
+1. **Generate.** It resolves your rules into a set of colored folders and bakes each
+   one's layers — background fill, left edge bar, label pill, text style, tiled
+   watermark — into a CSS/JS pair in the extension's global storage.
+2. **Paint.** That script runs inside the workbench, walks the Explorer's row DOM,
+   and applies the pre-computed values to each row.
 
-Install [`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css)
-(an unsupported extension that injects CSS/JS into the workbench), then:
+Step 2 is the part VS Code doesn't sanction: the only way into the workbench is to
+edit what it loads from disk. Premium Explorer can do that itself, or leave it to
+`be5invis.vscode-custom-css`. **Until you turn painting on you get the badge and
+nothing else** — every colour, bar, pill and watermark comes from the injected pair.
 
-1. Run **Premium Explorer: Generate Background CSS (vscode-custom-css)** from the
-   Command Palette. It resolves your rules, writes two files into the extension's
-   storage, and adds them to `vscode_custom_css.imports` for you.
-2. Run **Reload Custom CSS and JS** (from vscode-custom-css) and restart.
+## Turning on background painting
 
-After that, editing any `premiumExplorer.*` setting regenerates the files
-automatically and offers a **Reload Window** button to apply the change.
+Run **Premium Explorer: Enable Background Painting** from the Command Palette and
+reload the window. That is the whole setup.
 
-**Caveats:** this targets VS Code's internal `.monaco-list-row` DOM, so a VS Code
-update could break it; and after cloning/removing repos you should re-run the
-generate command.
+It writes the generated pair into your VS Code installation's workbench directory
+and adds two lines to `workbench.html`:
+
+```html
+<link rel="stylesheet" href="./premium-explorer.css">
+<script src="./premium-explorer.js"></script>
+```
+
+**Premium Explorer: Disable Background Painting (Restore Workbench)** undoes it.
+The original `workbench.html` is backed up before the first patch and restored
+byte-for-byte.
+
+### Before you enable it
+
+- **VS Code will report that your installation "appears corrupt."** `workbench.html`
+  is checksummed, so any change trips that banner. It's safe to dismiss — it means
+  the file differs from the shipped one, not that anything is broken.
+- **A VS Code update reverts it.** Updates replace the whole directory. Premium
+  Explorer notices on the next launch and offers to re-apply.
+- **The first run may need permission.** VS Code's install directory is usually
+  system-owned; if the patch can't be written you get the exact command to fix it.
+- **Desktop only.** The patch has to be applied on the machine drawing the window,
+  so this does nothing in the browser, or on the remote side of an SSH, WSL or
+  container window. Rules and badges still work there.
+- **It targets VS Code's internal DOM** (`.monaco-list-row`), which carries no
+  compatibility promise — an update can change it.
+
+Two deliberate differences from how vscode-custom-css patches the same file: the
+Content Security Policy is left intact (custom-css deletes it), and the tags above
+*reference* the generated files rather than carrying their contents, so changing a
+setting rewrites only those two files and never revisits `workbench.html`.
+
+### Using vscode-custom-css instead
+
+Still supported. Install
+[`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css),
+run **Premium Explorer: Generate Background CSS (for vscode-custom-css)** — which
+writes the pair and adds it to `vscode_custom_css.imports` — then run **Reload
+Custom CSS and JS** and restart. Don't enable both: two copies of the script would
+paint every row twice. Enabling Premium Explorer's own painting removes its entries
+from `vscode_custom_css.imports` for you.
+
+Either way, editing any `premiumExplorer.*` setting regenerates the files and offers
+a **Reload Window** button. After cloning or removing repositories, re-run the
+generate (or enable) command so the new folders are picked up.
 
 **Multiple workspaces:** the generated files are a single global set shared by
 every window, but colors are scoped **per workspace** — the injected script only
@@ -115,26 +159,36 @@ doesn't inherit another one's colors. Within one workspace, folders are matched 
 
 ## Commands
 
+- **Premium Explorer: Enable Background Painting** — generate the CSS/JS pair and
+  patch this VS Code install to load it.
+- **Premium Explorer: Disable Background Painting (Restore Workbench)** — undo that
+  patch and remove the files it added.
 - **Premium Explorer: Refresh Decorations** — re-read settings and re-apply.
-- **Premium Explorer: Generate Background CSS (vscode-custom-css)** — (re)write the
-  background files and wire up `vscode_custom_css.imports`.
+- **Premium Explorer: Generate Background CSS (for vscode-custom-css)** — (re)write
+  the background files and wire up `vscode_custom_css.imports` instead.
 
 ## Architecture
 
 ```
 src/
   extension.ts          Activation + event wiring (thin).
-  config.ts             Reads settings; resolves rules to absolute paths; maps a
-                        folder to its color; bridges custom hexes into
-                        workbench.colorCustomizations.
-  colors.ts             Pure hex/rgba/hash helpers (no VS Code deps).
-  decorationProvider.ts FileDecorationProvider that tints labels per rule.
+  config.ts             Reads settings; resolves rules to absolute paths, sorted
+                        deepest-first so a deeper rule wins.
+  colors.ts             Pure hex/rgba/hash helpers and the SVG watermark pattern
+                        generator (no VS Code deps).
+  decorationProvider.ts FileDecorationProvider. Adds the optional badge — the only
+                        Explorer styling the API allows.
   repositoryScanner.ts  Recursively finds Git repos under a path (for git rules).
   backgroundStyles.ts   Resolves rules into colored folders and generates the
-                        vscode-custom-css CSS/JS files.
+                        CSS/JS pair.
+  layers.ts             Bakes one folder's row styling into ready-to-apply values.
+  workbenchPatch.ts     Patches workbench.html to load that pair, and restores it.
+                        Pure Node, no VS Code deps.
+  injection.ts          The VS Code side of that: commands, prompts, and offering
+                        the patch back after a VS Code update removes it.
 media/
-  inject.js             The browser script injected by vscode-custom-css. Static
-                        logic; the per-folder colors are prepended at generate time.
+  inject.js             The browser script that does the painting. Static logic;
+                        the per-folder colors are prepended at generate time.
 ```
 
 ## Development

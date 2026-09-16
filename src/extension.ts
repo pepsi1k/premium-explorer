@@ -1,7 +1,8 @@
 /**
  * Entry point. Wires together:
- *   - the {@link FolderColorerProvider} that tints repo folder labels, and
- *   - the background-styles generator that (re)writes the vscode-custom-css files.
+ *   - the {@link FolderColorerProvider} that tints repo folder labels,
+ *   - the background-styles generator that (re)writes the injected CSS/JS pair, and
+ *   - the workbench patch that loads that pair without a second extension.
  *
  * The actual logic lives in the sibling modules; this file only handles activation
  * and event wiring.
@@ -10,6 +11,7 @@ import * as vscode from 'vscode';
 import { CONFIG_SECTION, readConfig } from './config';
 import { FolderColorerProvider } from './decorationProvider';
 import { generateBackgroundCss, regenerateIfConfigured, regenerateIfStale } from './backgroundStyles';
+import { disableInjection, enableInjection, restoreInjectionIfLost } from './injection';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	let config = readConfig();
@@ -51,10 +53,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	// generated files embed it verbatim and are only rewritten on a settings change.
 	void regenerateIfStale(context, config);
 
+	// A VS Code update silently undoes the workbench patch; offer it back.
+	void restoreInjectionIfLost(context, config);
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
 		vscode.commands.registerCommand('premium-explorer.generateBackgroundCss', () =>
 			generateBackgroundCss(context, config),
+		),
+		vscode.commands.registerCommand('premium-explorer.enableInjection', () =>
+			enableInjection(context, config),
+		),
+		vscode.commands.registerCommand('premium-explorer.disableInjection', () =>
+			disableInjection(context),
 		),
 	);
 }
