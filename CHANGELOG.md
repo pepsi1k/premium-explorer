@@ -3,6 +3,53 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.0.0] - 2026-09-16
+
+### Added
+- **Premium Explorer now paints backgrounds by itself.** Until now the colours,
+  edge bars, pills and watermarks only appeared if you also installed
+  `be5invis.vscode-custom-css` and wired the generated files into its import list
+  by hand. Run **Premium Explorer: Enable Background Painting** and reload the
+  window — that is the whole setup.
+
+  It works the only way anything can: VS Code has no API for Explorer row
+  backgrounds and extensions run in a separate process from the window you see,
+  so the generated CSS/JS pair is written into the installation's workbench
+  directory and two tags are added to `workbench.html` to load it. VS Code will
+  say the installation "appears corrupt" afterwards, because that file is
+  checksummed; the banner is safe to dismiss.
+
+  Two things it does differently from vscode-custom-css. The Content Security
+  Policy is left intact — the tags reference the files relatively, which
+  `script-src 'self'` already allows, so nothing is weakened to inline a script.
+  And because the tags *name* the files rather than carrying them, changing a
+  setting rewrites only those two files: `workbench.html` is never revisited and
+  the patch cannot go stale. There is no "reload the injected CSS" step any more.
+
+- **Premium Explorer: Disable Background Painting (Restore Workbench)** undoes
+  it. The original `workbench.html` is backed up before the first patch and
+  restored byte-for-byte, and the files added beside it are removed.
+
+- **A VS Code update no longer silently stops the colours.** An update replaces
+  the whole workbench directory, taking the patch with it. Premium Explorer
+  notices on the next launch and offers to re-apply.
+
+### Changed
+- **`be5invis.vscode-custom-css` is now optional, and still fully supported.**
+  The command that wires it up is unchanged, retitled **Premium Explorer:
+  Generate Background CSS (for vscode-custom-css)** to say which path it serves.
+  Don't run both: two copies of the painter would style every row twice.
+  Enabling Premium Explorer's own painting removes its entries from
+  `vscode_custom_css.imports` for you.
+- The README's description of how the extension works has been rewritten. The
+  old one described a mechanism the extension does not use — it claimed label
+  colours came from the decoration API and that custom hexes were bridged into
+  `workbench.colorCustomizations`. Neither has been true for some time.
+
+### Note
+1.3.0 and 1.4.0 were tagged but never reached the Marketplace, so this release
+also brings the built-in watermark glyphs described under 1.4.0 below.
+
 ## [1.4.0] - 2026-09-08
 
 ### Added
