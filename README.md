@@ -1,6 +1,6 @@
 # Premium Explorer
 
-<img src="assets/logo/logo-edge-ondark-128.png" alt="Premium Explorer logo" width="64" height="64" />
+<img src="assets/logo/png/logo-edge-ondark-128.png" alt="Premium Explorer logo" width="64" height="64" />
 
 Color folders in the VS Code Explorer using **path-scoped rules**. Point a rule at
 a folder and choose how it's colored:

@@ -3,6 +3,16 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.0.1] - 2026-09-17
+
+### Changed
+- **New icon.** The extension icon, README logo and in-repo artwork moved from
+  the old `logo.svg`/`logo-*.png` to a redrawn `logo-edge` mark, shipped as
+  light, dark-background (`-ondark`) and transparent variants (`assets/logo/svg/`,
+  `assets/logo/png/`) so the mark can sit on either a light or dark surface.
+- All TypeScript sources were reformatted from tabs to 2-space indentation, and
+  ESLint's `indent` rule now enforces it going forward.
+
 ## [2.0.0] - 2026-09-16
 
 ### Added
