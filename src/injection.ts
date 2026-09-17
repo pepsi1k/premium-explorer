@@ -7,7 +7,7 @@
 import * as vscode from 'vscode';
 import { FolderColorerConfig } from './config';
 import { unwireCustomCssImports, writeBackgroundFiles } from './backgroundStyles';
-import { PatchError, apply, inspect, remove } from './workbenchPatch';
+import { PatchError, apply, checkAccess, inspect, permissionHint, remove } from './workbenchPatch';
 
 /** Set once the user opts in, so a patch lost to a VS Code update can be offered back. */
 const INJECTION_STATE = 'premiumExplorer.injectionEnabled';
@@ -24,6 +24,16 @@ export async function enableInjection(
       'with the extension running on the same machine — not a browser, and not the remote ' +
       'side of an SSH/WSL/container window. Folder badges and label colors still work.',
     );
+    return;
+  }
+
+  // Ask before attempting, not after failing. A system-wide install is the normal
+  // shape on Linux and Windows, so the first run of this command usually lands on a
+  // root-owned directory — and discovering that from the deepest write meant a raw
+  // EACCES with an absolute path in it twice (issue #2).
+  const access = checkAccess(status.workbench.dir);
+  if (!access.writable) {
+    await reportNoAccess(status.workbench.dir, access.reason);
     return;
   }
 
@@ -91,7 +101,16 @@ export async function restoreInjectionIfLost(
   if (!context.globalState.get<boolean>(INJECTION_STATE)) {
     return;
   }
-  if (inspect().state !== 'unpatched') {
+  const status = inspect();
+  if (status.state !== 'unpatched') {
+    return;
+  }
+  // The update that removed the patch usually restored the install's own ownership
+  // too, so the write access the user granted last time is gone with it. Say that
+  // outright rather than offering a "Re-apply" that can only fail.
+  const access = checkAccess(status.workbench.dir);
+  if (!access.writable) {
+    await reportNoAccess(status.workbench.dir, access.reason, true);
     return;
   }
   const choice = await vscode.window.showInformationMessage(
@@ -104,19 +123,74 @@ export async function restoreInjectionIfLost(
   }
 }
 
-/** Show why a patch step failed, and hand over the fix when it is a command. */
+/** Where the install shapes and their fixes are written up. */
+const DOCS_URL = 'https://github.com/pepsi1k/premium-explorer#system-owned-installs';
+
+/**
+ * Report an install we cannot write into, and say what the user has to do about it.
+ *
+ * Reporting is the whole of our part. Granting write access to a system-owned
+ * directory needs privileges this process does not have, so the extension neither
+ * runs nor offers to run anything — it names the directory, states the situation,
+ * and leaves the change to the user, done deliberately and outside VS Code. The
+ * how-to lives in the README, behind **Details**.
+ *
+ * `lost` marks the call that follows a VS Code update, which is the one place the
+ * user needs telling that this recurs: the update replaced the whole directory and
+ * took their ownership of it along with the patch.
+ */
+async function reportNoAccess(
+  dir: string,
+  reason: 'permission' | 'readonly',
+  lost = false,
+): Promise<void> {
+  if (reason === 'readonly') {
+    // Snap and Flatpak mount the app from a read-only image, so there is no
+    // permission to grant — the only fix is a different package.
+    const choice = await vscode.window.showErrorMessage(
+      'Premium Explorer: this VS Code is installed on a read-only image (Snap or Flatpak), ' +
+      'so its workbench cannot be patched at all. Folder badges and label colors still ' +
+      'work; background painting needs the .deb/.rpm or tarball build.',
+      'Details',
+    );
+    if (choice === 'Details') {
+      await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+    }
+    return;
+  }
+
+  const lead = lost
+    ? 'Premium Explorer: the VS Code update removed its background painting and restored ' +
+      'the installation to system ownership, so it cannot be put back yet.'
+    : 'Premium Explorer: background painting needs write access to this VS Code ' +
+      'installation, and does not have it. Nothing has been changed.';
+  const choice = await vscode.window.showWarningMessage(
+    `${lead} ${permissionHint()} Give your user account write access to ${dir}, ` +
+    'then run the command again.',
+    'Details',
+  );
+  if (choice === 'Details') {
+    await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+  }
+}
+
+/**
+ * Show why a patch step failed. The permission case is preflighted in
+ * {@link enableInjection}, so what reaches here is the rarer kind — an unreadable
+ * file, a layout we don't recognise, a directory that turned unwritable between
+ * the check and the write. Each {@link PatchError} carries its own hint.
+ */
 async function reportPatchFailure(e: unknown): Promise<void> {
   if (!(e instanceof PatchError)) {
     vscode.window.showErrorMessage(`Premium Explorer: ${(e as Error).message}`);
     return;
   }
-  const command = e.hint.startsWith('Run: ') ? e.hint.slice('Run: '.length) : undefined;
   const choice = await vscode.window.showErrorMessage(
-    `Premium Explorer: ${e.message}\n\n${e.hint}`,
-    ...(command ? ['Copy Command'] : []),
+    `Premium Explorer: ${e.message} ${e.hint}`,
+    'Details',
   );
-  if (choice === 'Copy Command' && command) {
-    await vscode.env.clipboard.writeText(command);
+  if (choice === 'Details') {
+    await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
   }
 }
 

@@ -83,7 +83,9 @@ byte-for-byte.
 - **A VS Code update reverts it.** Updates replace the whole directory. Premium
   Explorer notices on the next launch and offers to re-apply.
 - **The first run may need permission.** VS Code's install directory is usually
-  system-owned; if the patch can't be written you get the exact command to fix it.
+  system-owned. Premium Explorer checks before it touches anything and warns you if
+  it can't write; granting access is a manual step you do yourself — see
+  [System-owned installs](#system-owned-installs).
 - **Desktop only.** The patch has to be applied on the machine drawing the window,
   so this does nothing in the browser, or on the remote side of an SSH, WSL or
   container window. Rules and badges still work there.
@@ -94,6 +96,54 @@ Two deliberate differences from how vscode-custom-css patches the same file: the
 Content Security Policy is left intact (custom-css deletes it), and the tags above
 *reference* the generated files rather than carrying their contents, so changing a
 setting rewrites only those two files and never revisits `workbench.html`.
+
+### System-owned installs
+
+The workbench lives inside VS Code's own installation, so patching it means writing
+into that directory. Whether you already can depends entirely on how VS Code was
+installed:
+
+| Install | Directory | Writable? |
+| --- | --- | --- |
+| Windows **User Installer** (the default download) | `%LOCALAPPDATA%\Programs\Microsoft VS Code` | **Yes** — nothing to do |
+| Windows **System Installer** | `C:\Program Files\Microsoft VS Code` | No — Administrator-owned |
+| macOS `.app` | `/Applications/Visual Studio Code.app` | Usually yes, if you installed it |
+| Linux `.deb` / `.rpm` / tarball to `/usr/share` | `/usr/share/code` | No — root-owned |
+| Linux tarball in your home directory | wherever you unpacked it | **Yes** |
+| Linux **Snap** or **Flatpak** | read-only image | **Never** |
+
+Premium Explorer tests this before it writes anything, so an install it can't write
+to is left exactly as it was. All it does then is tell you: a warning naming the
+directory and saying you need write access to it.
+
+**Granting that access is yours to do, and the extension will never do it for you.**
+It won't run anything privileged, won't ask for a password, and won't open a
+terminal on your behalf. What you do about it is your call — on Linux, typically:
+
+```
+sudo chown -R "$USER" "/usr/share/code/resources/app/out/vs/code/electron-browser/workbench"
+```
+
+Three things worth knowing before you run it:
+
+- **A VS Code update undoes it.** Updates replace that whole directory, which
+  restores root ownership *and* removes the patch. Premium Explorer notices on the
+  next launch and asks again — expect to repeat this after each update.
+- **On a `.deb`/`.rpm` install, package verification will notice.** `dpkg -V` and
+  `rpm -V` report the changed ownership. Nothing breaks; the report is cosmetic.
+- **On macOS it invalidates the app's code signature**, the same as any other
+  workbench-patching extension.
+
+**Snap and Flatpak cannot be made to work**, by this extension or any other in this
+space: the app is mounted from a read-only image, so there is no permission to
+grant. Install the `.deb`/`.rpm` or the tarball if you want background painting.
+On Windows, the permanent fix is the User Installer — reinstalling with it moves
+VS Code somewhere you already own, and the problem never comes back. (Running VS
+Code as Administrator once also works, but only for that session.)
+
+Folder badges and label colors need none of this — they use the supported
+decoration API and work on every install shape, including Snap, Flatpak and remote
+windows.
 
 ### Coming from vscode-custom-css
 

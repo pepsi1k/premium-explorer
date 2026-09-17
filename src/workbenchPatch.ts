@@ -73,6 +73,45 @@ export type Status =
   /** `version` is the extension version that applied the region that's in the file. */
   | { state: 'patched'; workbench: Workbench; version: string; customCss: boolean };
 
+/**
+ * Whether this machine's workbench directory can be patched at all, and if not, why.
+ * The distinction matters: `permission` is a permission change away, `readonly`
+ * cannot be fixed at all without reinstalling VS Code from a different package.
+ */
+export type Access =
+  | { writable: true }
+  /** Owned by root/Administrator — the normal shape of a system-wide install. */
+  | { writable: false; reason: 'permission' }
+  /** A read-only image (Snap, Flatpak, an `ro` mount). No permission exists to grant. */
+  | { writable: false; reason: 'readonly' };
+
+/**
+ * Can we patch this workbench? Answered by actually creating a file, because that
+ * is the operation that has to succeed: `fs.accessSync(W_OK)` only consults the mode
+ * bits and so gets ACLs, read-only mounts and root-squash wrong.
+ *
+ * Worth asking up front. Nothing is corrupted by finding out the hard way — the
+ * first write in {@link apply} is the backup, so a refused install is left
+ * untouched — but the user meets a raw EACCES from the deepest call instead of an
+ * explanation, which is issue #2.
+ */
+export function checkAccess(dir: string): Access {
+  const probe = path.join(dir, '.premium-explorer-access-probe');
+  try {
+    fs.writeFileSync(probe, '');
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return { writable: false, reason: code === 'EROFS' ? 'readonly' : 'permission' };
+  }
+  try {
+    fs.unlinkSync(probe);
+  } catch {
+    // Writable enough to patch, which is what was asked. A stray zero-byte probe
+    // in a directory we are about to write two files into is not worth failing on.
+  }
+  return { writable: true };
+}
+
 /** A patch step that failed, with something the user can actually act on. */
 export class PatchError extends Error {
   constructor(message: string, readonly hint: string) {
@@ -158,7 +197,7 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
   // our own tags as the pristine state to restore later.
   const backup = path.join(workbench.dir, BACKUP_FILE);
   if (!fs.existsSync(backup)) {
-    write(backup, clean, workbench.dir);
+    write(backup, clean);
   }
 
   if (!clean.includes('</head>')) {
@@ -177,7 +216,7 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
     `<script src="./${JS_FILE}"></script>`,
     END,
   ].join('\n');
-  write(workbench.html, clean.replace('</head>', `${region}\n</head>`), workbench.dir);
+  write(workbench.html, clean.replace('</head>', `${region}\n</head>`));
 
   mirror(workbench, sources);
 }
@@ -188,19 +227,19 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
  * is enough and the patch itself is never revisited.
  */
 export function mirror(workbench: Workbench, sources: Sources): void {
-  copy(sources.css, path.join(workbench.dir, CSS_FILE), workbench.dir);
-  copy(sources.js, path.join(workbench.dir, JS_FILE), workbench.dir);
+  copy(sources.css, path.join(workbench.dir, CSS_FILE));
+  copy(sources.js, path.join(workbench.dir, JS_FILE));
 }
 
 /** Restore `workbench.html` and remove everything this module put in the directory. */
 export function remove(workbench: Workbench): void {
   const backup = path.join(workbench.dir, BACKUP_FILE);
   if (fs.existsSync(backup)) {
-    write(workbench.html, read(backup), workbench.dir);
+    write(workbench.html, read(backup));
   } else {
     // No backup (an update replaced it, or it was deleted); fall back to cutting
     // our own region out, which is what it contributed in the first place.
-    write(workbench.html, read(workbench.html).replace(REGION, ''), workbench.dir);
+    write(workbench.html, read(workbench.html).replace(REGION, ''));
   }
   for (const file of [BACKUP_FILE, CSS_FILE, JS_FILE]) {
     try {
@@ -215,36 +254,52 @@ function read(file: string): string {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (e) {
-    throw new PatchError(`Could not read ${file}: ${(e as Error).message}`, permissionHint(path.dirname(file)));
+    throw new PatchError(`Could not read ${path.basename(file)}: ${reason(e)}`, permissionHint());
   }
 }
 
-function write(file: string, content: string, dir: string): void {
+function write(file: string, content: string): void {
   try {
     fs.writeFileSync(file, content, 'utf8');
   } catch (e) {
-    throw new PatchError(`Could not write ${file}: ${(e as Error).message}`, permissionHint(dir));
+    throw new PatchError(`Could not write ${path.basename(file)}: ${reason(e)}`, permissionHint());
   }
 }
 
-function copy(from: string, to: string, dir: string): void {
+function copy(from: string, to: string): void {
   try {
     fs.copyFileSync(from, to);
   } catch (e) {
-    throw new PatchError(`Could not copy ${from} to ${to}: ${(e as Error).message}`, permissionHint(dir));
+    throw new PatchError(`Could not copy in ${path.basename(to)}: ${reason(e)}`, permissionHint());
   }
 }
 
 /**
- * VS Code installs are owned by the system on every platform, so the first patch
- * fails until the user grants themselves write access. Tell them exactly how.
+ * Node appends the syscall and the full path to every `fs` error message. Both are
+ * dead weight in a notification: the path is a hundred characters the user cannot
+ * act on, and the hint below already names the one directory that matters. Keep
+ * only the part that says what went wrong — `EACCES: permission denied`.
  */
-function permissionHint(dir: string): string {
+function reason(e: unknown): string {
+  return (e as Error).message.replace(/,\s+\w+\s+'.*'$/, '');
+}
+
+/**
+ * Why this install is not writable, in one line.
+ *
+ * Says what is true, never what to type. Granting write access to a system-owned
+ * directory needs privileges this process does not have and must not ask for — it
+ * is the user's to do, deliberately, outside VS Code. So the extension describes
+ * the situation and stops there; the README carries the how-to.
+ */
+export function permissionHint(): string {
   if (process.platform === 'win32') {
-    return 'Close VS Code and reopen it as Administrator, then run the command again.';
+    return 'This VS Code was installed for all users, so its files are Administrator-owned. ' +
+      'Reinstalling with the User Installer puts VS Code somewhere your account already owns.';
   }
   if (process.platform === 'darwin') {
-    return `Run: sudo chown -R "$USER" "${dir}"  — note that modifying the app invalidates its code signature.`;
+    return 'This VS Code is owned by the system. Patching it also invalidates the app\'s ' +
+      'code signature.';
   }
-  return `Run: sudo chown -R "$USER" "${dir}"`;
+  return 'This VS Code was installed system-wide, so its files are root-owned.';
 }

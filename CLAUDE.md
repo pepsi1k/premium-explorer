@@ -167,6 +167,15 @@ time, so **dropping a file in is the whole code change**. Two things to know:
   "regenerate after an update" check always has a baseline. Generating without
   stamping means `regenerateIfStale()` fires a spurious reload prompt on the next
   activation.
+- **The workbench directory is usually not writable, and that is the normal case.**
+  A system-wide install (`/usr/share/code`, `C:\Program Files\...`) is root- or
+  Administrator-owned, so `checkAccess()` in
+  [workbenchPatch.ts](src/workbenchPatch.ts) probes it with a real write before
+  `apply()` is attempted — `fs.accessSync(W_OK)` gets ACLs, read-only mounts and
+  root-squash wrong. Snap and Flatpak report `EROFS` and can never be patched at
+  all, which is a different message, not a harsher one (issue #2). Nothing an
+  extension host can do escalates privilege: the fix is always the user's `sudo`,
+  their UAC prompt, or a different installer.
 - Settings files are JSONC — never read-parse-rewrite them, it destroys comments.
 - Commits in this repo are GPG-signed (`commit.gpgsign = true`). If signing fails,
   hand the commit to the user rather than reaching for `--no-gpg-sign`.

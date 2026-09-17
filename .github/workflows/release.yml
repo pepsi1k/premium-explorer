@@ -85,8 +85,37 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           VALIDATION: ${{ steps.validate.outcome }}
         run: |
+          # Normalise the two ways a pasted secret breaks the URL, since neither
+          # reports itself clearly:
+          #   whitespace (the GitHub UI keeps a trailing newline) -> curl exit 3,
+          #     "URL using bad/illegal format", with no mention of Telegram at all;
+          #   a `bot` prefix copied along with the token -> /botbot<id>:<secret>,
+          #     which Telegram answers with a bare 404.
+          TELEGRAM_BOT_TOKEN="$(printf '%s' "$TELEGRAM_BOT_TOKEN" | tr -d '[:space:]')"
+          TELEGRAM_CHAT_ID="$(printf '%s' "$TELEGRAM_CHAT_ID" | tr -d '[:space:]')"
+          TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN#bot}"
+
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "::notice::Telegram secrets not configured, skipping notification."
+            exit 0
+          fi
+
+          # Never print $TELEGRAM_BOT_TOKEN or a URL containing it: trimming it above
+          # produces a string GitHub's secret masking no longer recognises. Response
+          # bodies are safe — Telegram never echoes the token back.
+          api="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+
+          # Preflight against getMe, which tests only the token. Without it a bad
+          # token surfaces as a 404 on sendMessage that reads like a missing chat.
+          # The two failures mean different things and have different fixes:
+          #   401 Unauthorized -> the token is well-formed but wrong or revoked;
+          #   404 Not Found    -> it is malformed, i.e. not `<id>:<secret>`.
+          if ! code="$(curl -sS -o /tmp/tg-me.json -w '%{http_code}' "$api/getMe")" \
+             || [ "$code" != "200" ]; then
+            echo "::warning::Telegram rejected the bot token (HTTP ${code:-none}): $(cat /tmp/tg-me.json 2>/dev/null)"
+            echo "401 means the token is wrong or revoked; 404 means it is not shaped" \
+                 "like <id>:<secret>. Check the TELEGRAM_BOT_TOKEN secret holds exactly" \
+                 "what @BotFather issued — both halves, no 'bot' prefix."
             exit 0
           fi
 
@@ -111,9 +140,22 @@ jobs:
           <a href=\"$run_url\">See the workflow run</a>"
           fi
 
-          curl -sS --fail-with-body -o /dev/null \
-            -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          # Keep the body: it carries the only useful diagnosis Telegram offers
+          # ("chat not found", "bot was blocked by the user", …). The old
+          # --fail-with-body was defeated by -o /dev/null, which discarded exactly
+          # the text that explains the failure.
+          code="$(curl -sS -o /tmp/tg-send.json -w '%{http_code}' \
+            -X POST "$api/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${text}" \
             --data-urlencode "parse_mode=HTML" \
-            --data-urlencode "disable_web_page_preview=true"
+            --data-urlencode "disable_web_page_preview=true")" || code=''
+
+          if [ "$code" != "200" ]; then
+            echo "::warning::Telegram notification failed (HTTP ${code:-none}): $(cat /tmp/tg-send.json 2>/dev/null)"
+            echo "The release itself is unaffected, and the token is known good — the" \
+                 "preflight above passed. 400 'chat not found' means TELEGRAM_CHAT_ID is" \
+                 "wrong; 403 means the bot was never started or has been blocked."
+            exit 0
+          fi
+          echo "::notice::Telegram notified."

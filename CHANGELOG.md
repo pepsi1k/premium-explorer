@@ -3,6 +3,38 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.1] - 2026-09-18
+
+### Fixed
+- **Enabling background painting on a system-wide VS Code install no longer
+  dead-ends on a raw permission error** ([#2](https://github.com/pepsi1k/premium-explorer/issues/2)).
+  The workbench directory is now tested for write access *before* anything is
+  attempted, so instead of an `EACCES` toast quoting a 100-character path twice you
+  get a warning that names the directory and says you need write access to it.
+  Granting it stays a manual step you take yourself — the extension runs nothing
+  privileged, asks for no password, and opens no terminal on your behalf.
+- Snap and Flatpak installs are reported as what they are: the app is mounted from
+  a read-only image, so no permission can be granted and background painting is not
+  possible there. Previously they produced the same "run this chown" advice, which
+  could never have worked.
+- After a VS Code update removes the patch, the re-apply prompt now checks that the
+  directory is still writable. The update usually restores the install's own
+  ownership as well, so the prompt used to walk the user straight back into the
+  error they had already fixed once.
+
+### Changed
+- Patch failure messages no longer repeat the absolute path — Node's `fs` errors
+  are trimmed to the part that says what went wrong, and a **Details** button opens
+  the README section covering every install shape.
+- The Windows permission hint now recommends reinstalling with the User Installer,
+  which puts VS Code somewhere the user's own account already owns, rather than
+  suggesting running as Administrator.
+
+### Removed
+- The extension no longer produces, copies or offers to run a `sudo chown`. It
+  reports what it can't do and names the directory; the change itself is the
+  user's, made deliberately and outside VS Code. The README documents the how-to.
+
 ## [2.1.0] - 2026-09-17
 
 ### Removed

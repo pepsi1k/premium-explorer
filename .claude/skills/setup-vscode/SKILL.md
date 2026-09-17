@@ -13,6 +13,8 @@ allowed-tools: Bash(ls:*), Bash(cat:*), Bash(find:*), Bash(grep:*), Bash(node:*)
 - Generated files: !`ls -la ~/.config/Code/User/globalStorage/*premium-explorer*/ 2>/dev/null || echo "none — never generated"`
 - Workbench patch: !`grep -l 'premium-explorer' /usr/share/code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html /usr/share/code/resources/app/out/vs/code/electron-browser/workbench/workbench.html 2>/dev/null || echo "not patched (or VS Code installed elsewhere)"`
 - Leftover custom-css imports: !`grep -A6 'vscode_custom_css.imports' ~/.config/Code/User/settings.json 2>/dev/null || echo "none"`
+- Workbench dir ownership: !`ls -ld /usr/share/code/resources/app/out/vs/code/electron-browser/workbench /usr/share/code/resources/app/out/vs/code/electron-sandbox/workbench /snap/code/current/usr/share/code/resources/app/out/vs/code/electron-browser/workbench 2>/dev/null || echo "VS Code installed elsewhere"`
+- Who we are: !`id -un`
 
 ## Task
 
@@ -44,10 +46,36 @@ Work through it in order:
    the copies with it; the extension offers it back on the next launch, and
    re-running **Enable Background Painting** also fixes it.
 
-4. **Permissions.** On Linux the workbench lives in VS Code's own install
-   directory, usually root-owned. If the enable command reports failure it hands
-   over the exact `chown`/`chmod` to run — that's a permissions problem on the
-   install, not a Premium Explorer problem.
+4. **Permissions — and whether they are even grantable.** The workbench lives
+   inside VS Code's own installation, and on a system-wide install that directory
+   is root-owned. Compare the ownership above against `id -un`: if the user does
+   not own it, no patch has ever been written and none can be. The extension
+   detects this itself now and warns, naming the directory (issue #2), but it never
+   produces or runs a command — granting access is always the user's own step, so
+   reaching here means they have yet to take it.
+
+   **Check the install shape before handing over a `chown`**, because for two of
+   them it is the wrong advice:
+
+   - `/snap/code/...` or a Flatpak path — the app is a **read-only squashfs
+     image**. `chown` fails with `EROFS` and there is no permission to grant.
+     Background painting is impossible on that install; the only fix is the `.deb`
+     or the tarball. Say so plainly instead of offering a command.
+   - `C:\Program Files\Microsoft VS Code` — Administrator-owned. The permanent
+     fix is reinstalling with the **User Installer**
+     (`%LOCALAPPDATA%\Programs\Microsoft VS Code`), which is writable and stays
+     that way. Running VS Code as Administrator works for one session only.
+   - Anything under `$HOME` (a tarball unpacked there) — already writable, so a
+     failure here is *not* permissions and you are on the wrong step.
+
+   When `chown` is genuinely the answer, tell the user it is not one-time: a VS
+   Code update replaces the whole directory, restoring root ownership and removing
+   the patch together, so this recurs with every update. Also warn that on a
+   `.deb`/`.rpm` install `dpkg -V` / `rpm -V` will report the changed ownership —
+   cosmetic, but surprising if unmentioned.
+
+   **Never run the `sudo` yourself.** Hand over the command; the elevation is the
+   user's to authorise.
 
 5. **"Your installation appears corrupt."** Expected: `workbench.html` is
    checksummed, so any patch trips that banner. Dismissing it is safe and changes
