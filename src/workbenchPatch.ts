@@ -56,29 +56,29 @@ const STAMP = /<!-- premium-explorer:generated-by ([^\s>]+) -->/;
 
 /** The located workbench: the directory we write into, and the HTML we patch. */
 export interface Workbench {
-	dir: string;
-	html: string;
+  dir: string;
+  html: string;
 }
 
 /** Absolute paths of the generated pair in global storage, which we mirror. */
 export interface Sources {
-	css: string;
-	js: string;
+  css: string;
+  js: string;
 }
 
 export type Status =
-	/** No workbench HTML where one should be — a remote/web host, or an unknown layout. */
-	| { state: 'missing' }
-	| { state: 'unpatched'; workbench: Workbench; customCss: boolean }
-	/** `version` is the extension version that applied the region that's in the file. */
-	| { state: 'patched'; workbench: Workbench; version: string; customCss: boolean };
+  /** No workbench HTML where one should be — a remote/web host, or an unknown layout. */
+  | { state: 'missing' }
+  | { state: 'unpatched'; workbench: Workbench; customCss: boolean }
+  /** `version` is the extension version that applied the region that's in the file. */
+  | { state: 'patched'; workbench: Workbench; version: string; customCss: boolean };
 
 /** A patch step that failed, with something the user can actually act on. */
 export class PatchError extends Error {
-	constructor(message: string, readonly hint: string) {
-		super(message);
-		this.name = 'PatchError';
-	}
+  constructor(message: string, readonly hint: string) {
+    super(message);
+    this.name = 'PatchError';
+  }
 }
 
 /**
@@ -90,35 +90,35 @@ export class PatchError extends Error {
  * browser — both cases where there is nothing on this machine to patch.
  */
 export function locateWorkbench(): Workbench | undefined {
-	const appDir = require.main?.filename
-		? path.dirname(require.main.filename)
-		: (globalThis as { _VSCODE_FILE_ROOT?: string })._VSCODE_FILE_ROOT;
-	if (!appDir) {
-		return undefined;
-	}
-	const base = path.join(appDir, 'vs', 'code');
-	const dirs = [
-		path.join(base, 'electron-browser', 'workbench'), // 1.102+
-		path.join(base, 'electron-browser'),
-		path.join(base, 'electron-sandbox', 'workbench'), // older
-		path.join(base, 'electron-sandbox'),
-	];
-	// Dev and ESM builds first: where several exist, the more specific one is live.
-	const names = [
-		'workbench-dev.html',
-		'workbench.esm.html',
-		'workbench.html',
-		'workbench-apc-extension.html', // Cursor
-	];
-	for (const dir of dirs) {
-		for (const name of names) {
-			const html = path.join(dir, name);
-			if (fs.existsSync(html)) {
-				return { dir, html };
-			}
-		}
-	}
-	return undefined;
+  const appDir = require.main?.filename
+    ? path.dirname(require.main.filename)
+    : (globalThis as { _VSCODE_FILE_ROOT?: string })._VSCODE_FILE_ROOT;
+  if (!appDir) {
+    return undefined;
+  }
+  const base = path.join(appDir, 'vs', 'code');
+  const dirs = [
+    path.join(base, 'electron-browser', 'workbench'), // 1.102+
+    path.join(base, 'electron-browser'),
+    path.join(base, 'electron-sandbox', 'workbench'), // older
+    path.join(base, 'electron-sandbox'),
+  ];
+  // Dev and ESM builds first: where several exist, the more specific one is live.
+  const names = [
+    'workbench-dev.html',
+    'workbench.esm.html',
+    'workbench.html',
+    'workbench-apc-extension.html', // Cursor
+  ];
+  for (const dir of dirs) {
+    for (const name of names) {
+      const html = path.join(dir, name);
+      if (fs.existsSync(html)) {
+        return { dir, html };
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -127,21 +127,21 @@ export function locateWorkbench(): Workbench | undefined {
  * copies of the script fighting over the same rows, so the caller should say so.
  */
 export function inspect(): Status {
-	const workbench = locateWorkbench();
-	if (!workbench) {
-		return { state: 'missing' };
-	}
-	let html: string;
-	try {
-		html = fs.readFileSync(workbench.html, 'utf8');
-	} catch {
-		return { state: 'missing' };
-	}
-	const customCss = html.includes('VSCODE-CUSTOM-CSS-START');
-	if (!html.includes(START)) {
-		return { state: 'unpatched', workbench, customCss };
-	}
-	return { state: 'patched', workbench, version: STAMP.exec(html)?.[1] ?? '', customCss };
+  const workbench = locateWorkbench();
+  if (!workbench) {
+    return { state: 'missing' };
+  }
+  let html: string;
+  try {
+    html = fs.readFileSync(workbench.html, 'utf8');
+  } catch {
+    return { state: 'missing' };
+  }
+  const customCss = html.includes('VSCODE-CUSTOM-CSS-START');
+  if (!html.includes(START)) {
+    return { state: 'unpatched', workbench, customCss };
+  }
+  return { state: 'patched', workbench, version: STAMP.exec(html)?.[1] ?? '', customCss };
 }
 
 /**
@@ -151,35 +151,35 @@ export function inspect(): Status {
  * extension update refreshes the stamp without stacking a second copy.
  */
 export function apply(workbench: Workbench, version: string, sources: Sources): void {
-	const original = read(workbench.html);
-	const clean = original.replace(REGION, '');
+  const original = read(workbench.html);
+  const clean = original.replace(REGION, '');
 
-	// Back up the *cleaned* HTML — patching an already-patched file must not record
-	// our own tags as the pristine state to restore later.
-	const backup = path.join(workbench.dir, BACKUP_FILE);
-	if (!fs.existsSync(backup)) {
-		write(backup, clean, workbench.dir);
-	}
+  // Back up the *cleaned* HTML — patching an already-patched file must not record
+  // our own tags as the pristine state to restore later.
+  const backup = path.join(workbench.dir, BACKUP_FILE);
+  if (!fs.existsSync(backup)) {
+    write(backup, clean, workbench.dir);
+  }
 
-	if (!clean.includes('</head>')) {
-		throw new PatchError(
-			`No </head> in ${path.basename(workbench.html)} — this VS Code build has a workbench layout Premium Explorer does not understand.`,
-			'Please open an issue with your VS Code version; painting will not work until then.',
-		);
-	}
+  if (!clean.includes('</head>')) {
+    throw new PatchError(
+      `No </head> in ${path.basename(workbench.html)} — this VS Code build has a workbench layout Premium Explorer does not understand.`,
+      'Please open an issue with your VS Code version; painting will not work until then.',
+    );
+  }
 
-	// Into <head>, after the workbench's own stylesheet so ours cascades over it —
-	// and so auxiliary windows, which clone the head, are painted too.
-	const region = [
-		START,
-		`<!-- premium-explorer:generated-by ${version} -->`,
-		`<link rel="stylesheet" href="./${CSS_FILE}">`,
-		`<script src="./${JS_FILE}"></script>`,
-		END,
-	].join('\n');
-	write(workbench.html, clean.replace('</head>', `${region}\n</head>`), workbench.dir);
+  // Into <head>, after the workbench's own stylesheet so ours cascades over it —
+  // and so auxiliary windows, which clone the head, are painted too.
+  const region = [
+    START,
+    `<!-- premium-explorer:generated-by ${version} -->`,
+    `<link rel="stylesheet" href="./${CSS_FILE}">`,
+    `<script src="./${JS_FILE}"></script>`,
+    END,
+  ].join('\n');
+  write(workbench.html, clean.replace('</head>', `${region}\n</head>`), workbench.dir);
 
-	mirror(workbench, sources);
+  mirror(workbench, sources);
 }
 
 /**
@@ -188,51 +188,51 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
  * is enough and the patch itself is never revisited.
  */
 export function mirror(workbench: Workbench, sources: Sources): void {
-	copy(sources.css, path.join(workbench.dir, CSS_FILE), workbench.dir);
-	copy(sources.js, path.join(workbench.dir, JS_FILE), workbench.dir);
+  copy(sources.css, path.join(workbench.dir, CSS_FILE), workbench.dir);
+  copy(sources.js, path.join(workbench.dir, JS_FILE), workbench.dir);
 }
 
 /** Restore `workbench.html` and remove everything this module put in the directory. */
 export function remove(workbench: Workbench): void {
-	const backup = path.join(workbench.dir, BACKUP_FILE);
-	if (fs.existsSync(backup)) {
-		write(workbench.html, read(backup), workbench.dir);
-	} else {
-		// No backup (an update replaced it, or it was deleted); fall back to cutting
-		// our own region out, which is what it contributed in the first place.
-		write(workbench.html, read(workbench.html).replace(REGION, ''), workbench.dir);
-	}
-	for (const file of [BACKUP_FILE, CSS_FILE, JS_FILE]) {
-		try {
-			fs.unlinkSync(path.join(workbench.dir, file));
-		} catch {
-			// Already gone, which is the state we wanted.
-		}
-	}
+  const backup = path.join(workbench.dir, BACKUP_FILE);
+  if (fs.existsSync(backup)) {
+    write(workbench.html, read(backup), workbench.dir);
+  } else {
+    // No backup (an update replaced it, or it was deleted); fall back to cutting
+    // our own region out, which is what it contributed in the first place.
+    write(workbench.html, read(workbench.html).replace(REGION, ''), workbench.dir);
+  }
+  for (const file of [BACKUP_FILE, CSS_FILE, JS_FILE]) {
+    try {
+      fs.unlinkSync(path.join(workbench.dir, file));
+    } catch {
+      // Already gone, which is the state we wanted.
+    }
+  }
 }
 
 function read(file: string): string {
-	try {
-		return fs.readFileSync(file, 'utf8');
-	} catch (e) {
-		throw new PatchError(`Could not read ${file}: ${(e as Error).message}`, permissionHint(path.dirname(file)));
-	}
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (e) {
+    throw new PatchError(`Could not read ${file}: ${(e as Error).message}`, permissionHint(path.dirname(file)));
+  }
 }
 
 function write(file: string, content: string, dir: string): void {
-	try {
-		fs.writeFileSync(file, content, 'utf8');
-	} catch (e) {
-		throw new PatchError(`Could not write ${file}: ${(e as Error).message}`, permissionHint(dir));
-	}
+  try {
+    fs.writeFileSync(file, content, 'utf8');
+  } catch (e) {
+    throw new PatchError(`Could not write ${file}: ${(e as Error).message}`, permissionHint(dir));
+  }
 }
 
 function copy(from: string, to: string, dir: string): void {
-	try {
-		fs.copyFileSync(from, to);
-	} catch (e) {
-		throw new PatchError(`Could not copy ${from} to ${to}: ${(e as Error).message}`, permissionHint(dir));
-	}
+  try {
+    fs.copyFileSync(from, to);
+  } catch (e) {
+    throw new PatchError(`Could not copy ${from} to ${to}: ${(e as Error).message}`, permissionHint(dir));
+  }
 }
 
 /**
@@ -240,11 +240,11 @@ function copy(from: string, to: string, dir: string): void {
  * fails until the user grants themselves write access. Tell them exactly how.
  */
 function permissionHint(dir: string): string {
-	if (process.platform === 'win32') {
-		return 'Close VS Code and reopen it as Administrator, then run the command again.';
-	}
-	if (process.platform === 'darwin') {
-		return `Run: sudo chown -R "$USER" "${dir}"  — note that modifying the app invalidates its code signature.`;
-	}
-	return `Run: sudo chown -R "$USER" "${dir}"`;
+  if (process.platform === 'win32') {
+    return 'Close VS Code and reopen it as Administrator, then run the command again.';
+  }
+  if (process.platform === 'darwin') {
+    return `Run: sudo chown -R "$USER" "${dir}"  — note that modifying the app invalidates its code signature.`;
+  }
+  return `Run: sudo chown -R "$USER" "${dir}"`;
 }

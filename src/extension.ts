@@ -14,60 +14,60 @@ import { generateBackgroundCss, regenerateIfConfigured, regenerateIfStale } from
 import { disableInjection, enableInjection, restoreInjectionIfLost } from './injection';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-	let config = readConfig();
+  let config = readConfig();
 
-	const provider = new FolderColorerProvider(config);
-	context.subscriptions.push(
-		provider,
-		vscode.window.registerFileDecorationProvider(provider),
-	);
+  const provider = new FolderColorerProvider(config);
+  context.subscriptions.push(
+    provider,
+    vscode.window.registerFileDecorationProvider(provider),
+  );
 
-	// Re-read settings, refresh decorations, and (if the custom-css files already
-	// exist) regenerate them.
-	const reload = async (regenerate: boolean): Promise<void> => {
-		config = readConfig();
-		provider.setConfig(config);
-		provider.refreshAll();
-		if (regenerate) {
-			await regenerateIfConfigured(context, config);
-		}
-	};
+  // Re-read settings, refresh decorations, and (if the custom-css files already
+  // exist) regenerate them.
+  const reload = async (regenerate: boolean): Promise<void> => {
+    config = readConfig();
+    provider.setConfig(config);
+    provider.refreshAll();
+    if (regenerate) {
+      await regenerateIfConfigured(context, config);
+    }
+  };
 
-	// A `.git` appearing/disappearing changes repo membership of a whole subtree.
-	const gitWatcher = vscode.workspace.createFileSystemWatcher('**/.git');
-	gitWatcher.onDidCreate(() => provider.refreshAll());
-	gitWatcher.onDidDelete(() => provider.refreshAll());
-	context.subscriptions.push(gitWatcher);
+  // A `.git` appearing/disappearing changes repo membership of a whole subtree.
+  const gitWatcher = vscode.workspace.createFileSystemWatcher('**/.git');
+  gitWatcher.onDidCreate(() => provider.refreshAll());
+  gitWatcher.onDidDelete(() => provider.refreshAll());
+  context.subscriptions.push(gitWatcher);
 
-	context.subscriptions.push(
-		vscode.workspace.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration(CONFIG_SECTION)) {
-				void reload(true);
-			}
-		}),
-		// Relative rule paths resolve against the open folders, so re-read on change.
-		vscode.workspace.onDidChangeWorkspaceFolders(() => void reload(true)),
-	);
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration(CONFIG_SECTION)) {
+        void reload(true);
+      }
+    }),
+    // Relative rule paths resolve against the open folders, so re-read on change.
+    vscode.workspace.onDidChangeWorkspaceFolders(() => void reload(true)),
+  );
 
-	// An update ships a new painter that nothing would otherwise install — the
-	// generated files embed it verbatim and are only rewritten on a settings change.
-	void regenerateIfStale(context, config);
+  // An update ships a new painter that nothing would otherwise install — the
+  // generated files embed it verbatim and are only rewritten on a settings change.
+  void regenerateIfStale(context, config);
 
-	// A VS Code update silently undoes the workbench patch; offer it back.
-	void restoreInjectionIfLost(context, config);
+  // A VS Code update silently undoes the workbench patch; offer it back.
+  void restoreInjectionIfLost(context, config);
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
-		vscode.commands.registerCommand('premium-explorer.generateBackgroundCss', () =>
-			generateBackgroundCss(context, config),
-		),
-		vscode.commands.registerCommand('premium-explorer.enableInjection', () =>
-			enableInjection(context, config),
-		),
-		vscode.commands.registerCommand('premium-explorer.disableInjection', () =>
-			disableInjection(context),
-		),
-	);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
+    vscode.commands.registerCommand('premium-explorer.generateBackgroundCss', () =>
+      generateBackgroundCss(context, config),
+    ),
+    vscode.commands.registerCommand('premium-explorer.enableInjection', () =>
+      enableInjection(context, config),
+    ),
+    vscode.commands.registerCommand('premium-explorer.disableInjection', () =>
+      disableInjection(context),
+    ),
+  );
 }
 
 export function deactivate(): void {}

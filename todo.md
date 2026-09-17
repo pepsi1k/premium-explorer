@@ -1,0 +1,4 @@
+- [x] convert tabs -> 2 spaces on all typescript files
+- [] update icons, /desing-sync
+- [] rename releases in github, or just remove old ones
+- [] write all requirements

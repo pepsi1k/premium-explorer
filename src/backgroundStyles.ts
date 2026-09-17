@@ -48,14 +48,14 @@ type WorkspaceColors = Record<string, Record<string, FolderColors>>;
 
 /** The root row and inner rows of one colored folder, baked into the injected script. */
 interface FolderColors {
-	root: Part;
-	inner: Part;
+  root: Part;
+  inner: Part;
 }
 
 interface GeneratedFiles {
-	cssUri: vscode.Uri;
-	jsUri: vscode.Uri;
-	count: number;
+  cssUri: vscode.Uri;
+  jsUri: vscode.Uri;
+  count: number;
 }
 
 /**
@@ -64,48 +64,48 @@ interface GeneratedFiles {
  * are colored.
  */
 export async function writeBackgroundFiles(
-	context: vscode.ExtensionContext,
-	config: FolderColorerConfig,
+  context: vscode.ExtensionContext,
+  config: FolderColorerConfig,
 ): Promise<GeneratedFiles> {
-	// When disabled, write inert files. vscode-custom-css loads these files
-	// independently of the extension, so `premiumExplorer.enabled` has to clear them
-	// here — otherwise the last-generated backgrounds/selection keep painting.
-	if (!config.enabled) {
-		return writeFiles(context,
-			'/* premium-explorer disabled (premiumExplorer.enabled = false). */\n',
-			'// premium-explorer disabled (premiumExplorer.enabled = false).\n',
-			0,
-		);
-	}
+  // When disabled, write inert files. vscode-custom-css loads these files
+  // independently of the extension, so `premiumExplorer.enabled` has to clear them
+  // here — otherwise the last-generated backgrounds/selection keep painting.
+  if (!config.enabled) {
+    return writeFiles(context,
+      '/* premium-explorer disabled (premiumExplorer.enabled = false). */\n',
+      '// premium-explorer disabled (premiumExplorer.enabled = false).\n',
+      0,
+    );
+  }
 
-	// Resolve this window's colored folders (each already expanded into its baked
-	// layers) and attribute each to the workspace folder that owns it, then merge
-	// into the persisted cross-workspace union so other workspaces' colors survive
-	// (and this workspace's stale ones are cleared).
-	const coloredFolders = await resolveColoredFolders(config, context.extensionUri.fsPath);
-	const thisWindow = groupByWorkspace(coloredFolders, bakeAll(coloredFolders));
-	const workspaces = mergeWorkspaceColors(context, thisWindow);
+  // Resolve this window's colored folders (each already expanded into its baked
+  // layers) and attribute each to the workspace folder that owns it, then merge
+  // into the persisted cross-workspace union so other workspaces' colors survive
+  // (and this workspace's stale ones are cleared).
+  const coloredFolders = await resolveColoredFolders(config, context.extensionUri.fsPath);
+  const thisWindow = groupByWorkspace(coloredFolders, bakeAll(coloredFolders));
+  const workspaces = mergeWorkspaceColors(context, thisWindow);
 
-	const selection = buildSelection(config);
-	const css = buildCss();
-	const js = await buildInjectedScript(context, {
-		workspaces,
-		selections: mergeWorkspaceSelection(context, selection),
-		// The fallback for a workspace that is in the colors union but not yet in the
-		// selection one — its window last generated before selections were split per
-		// workspace. It self-heals the next time that window generates.
-		selection,
-	});
+  const selection = buildSelection(config);
+  const css = buildCss();
+  const js = await buildInjectedScript(context, {
+    workspaces,
+    selections: mergeWorkspaceSelection(context, selection),
+    // The fallback for a workspace that is in the colors union but not yet in the
+    // selection one — its window last generated before selections were split per
+    // workspace. It self-heals the next time that window generates.
+    selection,
+  });
 
-	// `count` is what this workspace matched (drives the "no folders" warning).
-	const count = Object.values(thisWindow).reduce((n, m) => n + Object.keys(m).length, 0);
-	return writeFiles(context, css, js, count);
+  // `count` is what this workspace matched (drives the "no folders" warning).
+  const count = Object.values(thisWindow).reduce((n, m) => n + Object.keys(m).length, 0);
+  return writeFiles(context, css, js, count);
 }
 
 
 /** Lowercased workspace-folder name used as the union key (and matched in the DOM). */
 function workspaceKey(name: string): string {
-	return name.trim().toLowerCase();
+  return name.trim().toLowerCase();
 }
 
 /**
@@ -114,25 +114,25 @@ function workspaceKey(name: string): string {
  * absolute rule pointing elsewhere — are dropped (they can't appear in this tree).
  */
 function groupByWorkspace(colored: ColoredFolder[], baked: Map<string, FolderColors>): WorkspaceColors {
-	const folders = vscode.workspace.workspaceFolders ?? [];
-	const grouped: WorkspaceColors = {};
-	// Ensure every current root has an entry, so a workspace whose rules now match
-	// nothing overwrites its stale union entry with an empty map (clearing it).
-	for (const folder of folders) {
-		grouped[workspaceKey(folder.name)] = {};
-	}
-	for (const folder of colored) {
-		const owner = folders.find(f => isWithin(f.uri.fsPath, folder.absPath));
-		const colors = baked.get(folder.absPath);
-		if (owner && colors) {
-			grouped[workspaceKey(owner.name)][folder.name] = colors;
-		}
-	}
-	return grouped;
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  const grouped: WorkspaceColors = {};
+  // Ensure every current root has an entry, so a workspace whose rules now match
+  // nothing overwrites its stale union entry with an empty map (clearing it).
+  for (const folder of folders) {
+    grouped[workspaceKey(folder.name)] = {};
+  }
+  for (const folder of colored) {
+    const owner = folders.find(f => isWithin(f.uri.fsPath, folder.absPath));
+    const colors = baked.get(folder.absPath);
+    if (owner && colors) {
+      grouped[workspaceKey(owner.name)][folder.name] = colors;
+    }
+  }
+  return grouped;
 }
 
 function isWithin(ancestor: string, target: string): boolean {
-	return target === ancestor || target.startsWith(ancestor + path.sep);
+  return target === ancestor || target.startsWith(ancestor + path.sep);
 }
 
 /**
@@ -141,30 +141,30 @@ function isWithin(ancestor: string, target: string): boolean {
  * (so other open/closed workspaces stay colored). Persists the result.
  */
 function mergeWorkspaceColors(
-	context: vscode.ExtensionContext,
-	thisWindow: WorkspaceColors,
+  context: vscode.ExtensionContext,
+  thisWindow: WorkspaceColors,
 ): WorkspaceColors {
-	const stored = context.globalState.get<WorkspaceColors>(WORKSPACE_COLORS_STATE) ?? {};
-	const union: WorkspaceColors = { ...stored, ...thisWindow };
-	void context.globalState.update(WORKSPACE_COLORS_STATE, union);
-	return union;
+  const stored = context.globalState.get<WorkspaceColors>(WORKSPACE_COLORS_STATE) ?? {};
+  const union: WorkspaceColors = { ...stored, ...thisWindow };
+  void context.globalState.update(WORKSPACE_COLORS_STATE, union);
+  return union;
 }
 
 /** This window's `premiumExplorer.selected*` settings, as the painter reads them. */
 function buildSelection(config: FolderColorerConfig): SelectionOptions {
-	const s = config.selection;
-	return {
-		bg: s.background,
-		shift: s.shift,
-		text: s.text,
-		opacity: s.opacity,
-		border: s.border,
-		inactiveDarken: s.inactiveDarken,
-		overrides: s.overrides,
-		watermark: s.watermark,
-		watermarkContrast: s.watermarkContrast,
-		bold: s.bold,
-	};
+  const s = config.selection;
+  return {
+    bg: s.background,
+    shift: s.shift,
+    text: s.text,
+    opacity: s.opacity,
+    border: s.border,
+    inactiveDarken: s.inactiveDarken,
+    overrides: s.overrides,
+    watermark: s.watermark,
+    watermarkContrast: s.watermarkContrast,
+    bold: s.bold,
+  };
 }
 
 /**
@@ -174,17 +174,17 @@ function buildSelection(config: FolderColorerConfig): SelectionOptions {
  * workspace's answer, and the last window to generate won.
  */
 function mergeWorkspaceSelection(
-	context: vscode.ExtensionContext,
-	selection: SelectionOptions,
+  context: vscode.ExtensionContext,
+  selection: SelectionOptions,
 ): WorkspaceSelection {
-	const thisWindow: WorkspaceSelection = {};
-	for (const folder of vscode.workspace.workspaceFolders ?? []) {
-		thisWindow[workspaceKey(folder.name)] = selection;
-	}
-	const stored = context.globalState.get<WorkspaceSelection>(WORKSPACE_SELECTION_STATE) ?? {};
-	const union: WorkspaceSelection = { ...stored, ...thisWindow };
-	void context.globalState.update(WORKSPACE_SELECTION_STATE, union);
-	return union;
+  const thisWindow: WorkspaceSelection = {};
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    thisWindow[workspaceKey(folder.name)] = selection;
+  }
+  const stored = context.globalState.get<WorkspaceSelection>(WORKSPACE_SELECTION_STATE) ?? {};
+  const union: WorkspaceSelection = { ...stored, ...thisWindow };
+  void context.globalState.update(WORKSPACE_SELECTION_STATE, union);
+  return union;
 }
 
 /**
@@ -197,18 +197,18 @@ function mergeWorkspaceSelection(
  * without having to know which one that is.
  */
 async function writeFiles(
-	context: vscode.ExtensionContext,
-	css: string,
-	js: string,
-	count: number,
+  context: vscode.ExtensionContext,
+  css: string,
+  js: string,
+  count: number,
 ): Promise<GeneratedFiles> {
-	await vscode.workspace.fs.createDirectory(context.globalStorageUri);
-	const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
-	const jsUri = vscode.Uri.joinPath(context.globalStorageUri, JS_FILE);
-	await vscode.workspace.fs.writeFile(cssUri, Buffer.from(css, 'utf8'));
-	await vscode.workspace.fs.writeFile(jsUri, Buffer.from(js, 'utf8'));
-	mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath);
-	return { cssUri, jsUri, count };
+  await vscode.workspace.fs.createDirectory(context.globalStorageUri);
+  const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
+  const jsUri = vscode.Uri.joinPath(context.globalStorageUri, JS_FILE);
+  await vscode.workspace.fs.writeFile(cssUri, Buffer.from(css, 'utf8'));
+  await vscode.workspace.fs.writeFile(jsUri, Buffer.from(js, 'utf8'));
+  mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath);
+  return { cssUri, jsUri, count };
 }
 
 /**
@@ -219,15 +219,15 @@ async function writeFiles(
  * one prompt on activation — not a warning every time a setting moves.
  */
 function mirrorToWorkbench(css: string, js: string): void {
-	const status = inspectWorkbench();
-	if (status.state !== 'patched') {
-		return;
-	}
-	try {
-		mirrorWorkbench(status.workbench, { css, js });
-	} catch {
-		// Surfaced by the activation check and the enable command instead.
-	}
+  const status = inspectWorkbench();
+  if (status.state !== 'patched') {
+    return;
+  }
+  try {
+    mirrorWorkbench(status.workbench, { css, js });
+  } catch {
+    // Surfaced by the activation check and the enable command instead.
+  }
 }
 
 /**
@@ -236,45 +236,45 @@ function mirrorToWorkbench(css: string, js: string): void {
  * name, so two folders with the same name inside one workspace share a color.
  */
 async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot: string): Promise<ColoredFolder[]> {
-	const byName = new Map<string, ColoredFolder>();
+  const byName = new Map<string, ColoredFolder>();
 
-	// Git repos discovered under `git` rules, unless a deeper (manual) rule governs
-	// them — in that case the manual folder below covers the region instead.
-	for (const rule of config.rules) {
-		if (rule.engine !== 'git') {
-			continue;
-		}
-		for (const repo of await findRepositories(vscode.Uri.file(rule.absPath))) {
-			if (deepestRuleFor(config, repo)?.engine !== 'git') {
-				continue; // masked by a more specific manual rule
-			}
-			const name = path.basename(repo.fsPath);
-			if (!byName.has(name)) {
-				const hex = gitRepoColorHex(config, repo);
-				byName.set(name, {
-					name, hex, absPath: repo.fsPath,
-					...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
-					...mergedParts(rule, config),
-				});
-			}
-		}
-	}
+  // Git repos discovered under `git` rules, unless a deeper (manual) rule governs
+  // them — in that case the manual folder below covers the region instead.
+  for (const rule of config.rules) {
+    if (rule.engine !== 'git') {
+      continue;
+    }
+    for (const repo of await findRepositories(vscode.Uri.file(rule.absPath))) {
+      if (deepestRuleFor(config, repo)?.engine !== 'git') {
+        continue; // masked by a more specific manual rule
+      }
+      const name = path.basename(repo.fsPath);
+      if (!byName.has(name)) {
+        const hex = gitRepoColorHex(config, repo);
+        byName.set(name, {
+          name, hex, absPath: repo.fsPath,
+          ...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
+          ...mergedParts(rule, config),
+        });
+      }
+    }
+  }
 
-	// Manual folders take precedence over a git repo that shares their name. Their
-	// base color is `premiumExplorer.defaultColor` — the fallback each layer uses when
-	// its own `*Color` is empty. Set those per layer to color a folder deliberately.
-	for (const rule of config.rules) {
-		if (rule.engine !== 'git') {
-			const name = path.basename(rule.absPath);
-			byName.set(name, {
-				name, hex: config.defaultColor, absPath: rule.absPath,
-				...identityOf(config, name, rule.absPath, config.defaultColor, extensionRoot, rule.backgroundWatermarkSymbol),
-				...mergedParts(rule, config),
-			});
-		}
-	}
+  // Manual folders take precedence over a git repo that shares their name. Their
+  // base color is `premiumExplorer.defaultColor` — the fallback each layer uses when
+  // its own `*Color` is empty. Set those per layer to color a folder deliberately.
+  for (const rule of config.rules) {
+    if (rule.engine !== 'git') {
+      const name = path.basename(rule.absPath);
+      byName.set(name, {
+        name, hex: config.defaultColor, absPath: rule.absPath,
+        ...identityOf(config, name, rule.absPath, config.defaultColor, extensionRoot, rule.backgroundWatermarkSymbol),
+        ...mergedParts(rule, config),
+      });
+    }
+  }
 
-	return [...byName.values()];
+  return [...byName.values()];
 }
 
 /**
@@ -284,19 +284,19 @@ async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot:
  * name's initial.
  */
 function identityOf(
-	config: FolderColorerConfig,
-	name: string,
-	absPath: string,
-	hex: string,
-	extensionRoot: string,
-	watermark?: string,
+  config: FolderColorerConfig,
+  name: string,
+  absPath: string,
+  hex: string,
+  extensionRoot: string,
+  watermark?: string,
 ): Pick<ColoredFolder, 'sequence' | 'art'> {
-	const basis = config.colorBy === 'path' ? absPath : name;
-	const source = watermark || config.backgroundWatermarkSymbol || (Array.from(name)[0] ?? '').toUpperCase();
-	return {
-		sequence: paletteSequence(basis, config.palette, config.edgeColorCount, hex),
-		art: resolveWatermarkArt(source, absPath, extensionRoot),
-	};
+  const basis = config.colorBy === 'path' ? absPath : name;
+  const source = watermark || config.backgroundWatermarkSymbol || (Array.from(name)[0] ?? '').toUpperCase();
+  return {
+    sequence: paletteSequence(basis, config.palette, config.edgeColorCount, hex),
+    art: resolveWatermarkArt(source, absPath, extensionRoot),
+  };
 }
 
 /**
@@ -312,34 +312,34 @@ function identityOf(
  * still wins over the one in the box.
  */
 function resolveWatermarkArt(source: string, absPath: string, extensionRoot: string): WatermarkArt {
-	const initial = (Array.from(path.basename(absPath))[0] ?? '?').toUpperCase();
-	const isPath = isSvgSource(source);
-	let markup = '';
-	if (isPath) {
-		markup = source.startsWith('<svg') ? source
-			: source.startsWith('data:image/svg+xml') ? decodeSvgDataUri(source)
-				: readSvgFile(source, absPath);
-	}
-	if (!markup) {
-		markup = builtinGlyph(source, extensionRoot);
-	}
-	const parsed = markup ? parseSvgMarkup(markup) : undefined;
-	if (parsed) {
-		// Seed off the source, not the markup, so the scatter survives edits to the file.
-		return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, key: source };
-	}
-	if (isPath) {
-		console.warn(`premium-explorer: could not load backgroundWatermarkSymbol "${source}"`);
-		return { kind: 'watermark', content: initial, key: initial };
-	}
-	// Not a drawing, so it is text. Two code points is all that fits legibly, and a
-	// longer value is a misspelt glyph name rather than something anyone wants drawn.
-	const text = Array.from(source).slice(0, 2).join('');
-	if (Array.from(source).length > 2) {
-		console.warn(`premium-explorer: backgroundWatermarkSymbol "${source}" is neither a readable .svg `
-			+ `nor a built-in glyph (${glyphNames(extensionRoot).join(', ') || 'none found'}); drawing "${text}".`);
-	}
-	return { kind: 'watermark', content: text || initial, key: text || initial };
+  const initial = (Array.from(path.basename(absPath))[0] ?? '?').toUpperCase();
+  const isPath = isSvgSource(source);
+  let markup = '';
+  if (isPath) {
+    markup = source.startsWith('<svg') ? source
+      : source.startsWith('data:image/svg+xml') ? decodeSvgDataUri(source)
+        : readSvgFile(source, absPath);
+  }
+  if (!markup) {
+    markup = builtinGlyph(source, extensionRoot);
+  }
+  const parsed = markup ? parseSvgMarkup(markup) : undefined;
+  if (parsed) {
+    // Seed off the source, not the markup, so the scatter survives edits to the file.
+    return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, key: source };
+  }
+  if (isPath) {
+    console.warn(`premium-explorer: could not load backgroundWatermarkSymbol "${source}"`);
+    return { kind: 'watermark', content: initial, key: initial };
+  }
+  // Not a drawing, so it is text. Two code points is all that fits legibly, and a
+  // longer value is a misspelt glyph name rather than something anyone wants drawn.
+  const text = Array.from(source).slice(0, 2).join('');
+  if (Array.from(source).length > 2) {
+    console.warn(`premium-explorer: backgroundWatermarkSymbol "${source}" is neither a readable .svg `
+      + `nor a built-in glyph (${glyphNames(extensionRoot).join(', ') || 'none found'}); drawing "${text}".`);
+  }
+  return { kind: 'watermark', content: text || initial, key: text || initial };
 }
 
 /**
@@ -349,26 +349,26 @@ function resolveWatermarkArt(source: string, absPath: string, extensionRoot: str
  */
 let glyphCache: { root: string; files: Map<string, string> } | undefined;
 function glyphCatalogue(extensionRoot: string): Map<string, string> {
-	if (glyphCache?.root !== extensionRoot) {
-		const dir = path.join(extensionRoot, GLYPH_DIR);
-		const files = new Map<string, string>();
-		try {
-			for (const file of fs.readdirSync(dir)) {
-				if (file.toLowerCase().endsWith('.svg')) {
-					files.set(file.slice(0, -4).toLowerCase(), path.join(dir, file));
-				}
-			}
-		} catch {
-			// No assets directory — every name falls through to the text watermark.
-		}
-		glyphCache = { root: extensionRoot, files };
-	}
-	return glyphCache.files;
+  if (glyphCache?.root !== extensionRoot) {
+    const dir = path.join(extensionRoot, GLYPH_DIR);
+    const files = new Map<string, string>();
+    try {
+      for (const file of fs.readdirSync(dir)) {
+        if (file.toLowerCase().endsWith('.svg')) {
+          files.set(file.slice(0, -4).toLowerCase(), path.join(dir, file));
+        }
+      }
+    } catch {
+      // No assets directory — every name falls through to the text watermark.
+    }
+    glyphCache = { root: extensionRoot, files };
+  }
+  return glyphCache.files;
 }
 
 /** Names the shipped glyphs answer to, for the warning that lists them. */
 function glyphNames(extensionRoot: string): string[] {
-	return [...glyphCatalogue(extensionRoot).keys()].sort();
+  return [...glyphCatalogue(extensionRoot).keys()].sort();
 }
 
 /**
@@ -377,62 +377,62 @@ function glyphNames(extensionRoot: string): string[] {
  * carrying a path separator is a path, not a name, and never reaches here.
  */
 function builtinGlyph(source: string, extensionRoot: string): string {
-	const name = source.trim().replace(/\.svg$/i, '').toLowerCase();
-	if (!/^[a-z0-9][a-z0-9._-]*$/.test(name)) {
-		return '';
-	}
-	const file = glyphCatalogue(extensionRoot).get(name);
-	if (!file) {
-		return '';
-	}
-	try {
-		return fs.readFileSync(file, 'utf8');
-	} catch {
-		return '';
-	}
+  const name = source.trim().replace(/\.svg$/i, '').toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(name)) {
+    return '';
+  }
+  const file = glyphCatalogue(extensionRoot).get(name);
+  if (!file) {
+    return '';
+  }
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 /** Read an `.svg` file: absolute, `~`-relative, or relative to the folder it decorates. */
 function readSvgFile(source: string, absPath: string): string {
-	const expanded = source.startsWith('~/') ? path.join(os.homedir(), source.slice(2)) : source;
-	const candidates = path.isAbsolute(expanded)
-		? [expanded]
-		: [
-			path.resolve(absPath, expanded),
-			...(vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath, expanded)),
-		];
-	for (const file of candidates) {
-		try {
-			return fs.readFileSync(file, 'utf8');
-		} catch {
-			// Try the next candidate root.
-		}
-	}
-	return '';
+  const expanded = source.startsWith('~/') ? path.join(os.homedir(), source.slice(2)) : source;
+  const candidates = path.isAbsolute(expanded)
+    ? [expanded]
+    : [
+      path.resolve(absPath, expanded),
+      ...(vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath, expanded)),
+    ];
+  for (const file of candidates) {
+    try {
+      return fs.readFileSync(file, 'utf8');
+    } catch {
+      // Try the next candidate root.
+    }
+  }
+  return '';
 }
 
 /** Decode a `data:image/svg+xml` URI, whether percent-encoded or base64. */
 function decodeSvgDataUri(uri: string): string {
-	const comma = uri.indexOf(',');
-	if (comma < 0) {
-		return '';
-	}
-	const payload = uri.slice(comma + 1);
-	try {
-		return uri.slice(0, comma).includes(';base64')
-			? Buffer.from(payload, 'base64').toString('utf8')
-			: decodeURIComponent(payload);
-	} catch {
-		return '';
-	}
+  const comma = uri.indexOf(',');
+  if (comma < 0) {
+    return '';
+  }
+  const payload = uri.slice(comma + 1);
+  try {
+    return uri.slice(0, comma).includes(';base64')
+      ? Buffer.from(payload, 'base64').toString('utf8')
+      : decodeURIComponent(payload);
+  } catch {
+    return '';
+  }
 }
 
 /** Merge a rule's per-layer overrides over the global root/inner defaults. */
 function mergedParts(rule: ResolvedRule, config: FolderColorerConfig): { root: PartConfig; inner: PartConfig } {
-	return {
-		root: { ...config.root, ...rule.root },
-		inner: { ...config.inner, ...rule.inner },
-	};
+  return {
+    root: { ...config.root, ...rule.root },
+    inner: { ...config.inner, ...rule.inner },
+  };
 }
 
 /**
@@ -441,27 +441,27 @@ function mergedParts(rule: ResolvedRule, config: FolderColorerConfig): { root: P
  * `inherit` layer can simply read the ancestor's finished colors.
  */
 function bakeAll(colored: ColoredFolder[]): Map<string, FolderColors> {
-	const ordered = [...colored].sort((a, b) => a.absPath.length - b.absPath.length);
-	const baked = new Map<string, FolderColors>();
-	for (const folder of ordered) {
-		// Nearest enclosing colored folder = the longest ancestor path.
-		let nearest: ColoredFolder | undefined;
-		for (const other of ordered) {
-			if (other.absPath === folder.absPath || !isWithin(other.absPath, folder.absPath)) {
-				continue;
-			}
-			if (!nearest || other.absPath.length > nearest.absPath.length) {
-				nearest = other;
-			}
-		}
-		// Nested rules inherit from what the parent paints on its *contents*.
-		const inheritFrom = nearest ? baked.get(nearest.absPath)?.inner : undefined;
-		baked.set(folder.absPath, {
-			root: buildPart(folder, folder.root, inheritFrom),
-			inner: buildPart(folder, folder.inner, inheritFrom),
-		});
-	}
-	return baked;
+  const ordered = [...colored].sort((a, b) => a.absPath.length - b.absPath.length);
+  const baked = new Map<string, FolderColors>();
+  for (const folder of ordered) {
+    // Nearest enclosing colored folder = the longest ancestor path.
+    let nearest: ColoredFolder | undefined;
+    for (const other of ordered) {
+      if (other.absPath === folder.absPath || !isWithin(other.absPath, folder.absPath)) {
+        continue;
+      }
+      if (!nearest || other.absPath.length > nearest.absPath.length) {
+        nearest = other;
+      }
+    }
+    // Nested rules inherit from what the parent paints on its *contents*.
+    const inheritFrom = nearest ? baked.get(nearest.absPath)?.inner : undefined;
+    baked.set(folder.absPath, {
+      root: buildPart(folder, folder.root, inheritFrom),
+      inner: buildPart(folder, folder.inner, inheritFrom),
+    });
+  }
+  return baked;
 }
 
 /**
@@ -470,78 +470,78 @@ function bakeAll(colored: ColoredFolder[]): Map<string, FolderColors> {
  * the inline decoration colors so badges stay readable on a bright selection.
  */
 function buildCss(): string {
-	const header =
-		'/* Auto-generated by premium-explorer for be5invis.vscode-custom-css. */\n' +
-		'/* Backgrounds, hover and selection are painted by premium-explorer.js. */\n';
+  const header =
+    '/* Auto-generated by premium-explorer for be5invis.vscode-custom-css. */\n' +
+    '/* Backgrounds, hover and selection are painted by premium-explorer.js. */\n';
 
-	// The inline rename box. VS Code paints it with the theme's own input colors, so on
-	// a colored row it lands as a foreign slab with the row's fill left showing as a
-	// stub in the indent gutter. Instead the row itself shifts a step off its usual
-	// color while it is being edited (see `EDIT_SHIFT` in the script) and the box gets
-	// out of the way entirely — transparent, so the shifted fill and the watermark over
-	// it carry straight through, with a border to mark where the typing goes. The
-	// script publishes that border and a foreground that reads against the shifted
-	// color; the fallbacks leave rows we don't paint with the theme's own input look.
-	//
-	// This has to be applied from here rather than inline, because
-	// `InputBox.applyStyles()` rewrites its own inline colors on every validation pass
-	// and would win against a script that set them directly — `!important` from a
-	// stylesheet outranks any inline declaration. `caret-color` follows `color`, so the
-	// caret is lit by the same rule.
-	const editRow = 'body.fc-active .explorer-folders-view .monaco-list-row.fc-editing';
-	const editCss =
-		'\n/* Inline rename box: the row itself shifts, the box just marks the field. */\n' +
-		`${editRow} .monaco-inputbox {\n` +
-		'\tbackground-color: transparent !important;\n' +
-		'\tborder-color: transparent !important;\n' +
-		'\tcolor: var(--fc-edit-fg, var(--vscode-input-foreground)) !important;\n' +
-		'}\n' +
-		`${editRow} .monaco-inputbox input {\n` +
-		'\tbackground-color: var(--fc-edit-field, var(--vscode-input-background)) !important;\n' +
-		'\tcolor: var(--fc-edit-fg, var(--vscode-input-foreground)) !important;\n' +
-		'\toutline: 1px solid var(--fc-edit-border, var(--vscode-focusBorder)) !important;\n' +
-		'\toutline-offset: -1px !important;\n' +
-		'\tborder-radius: 3px;\n' +
-		'}\n';
+  // The inline rename box. VS Code paints it with the theme's own input colors, so on
+  // a colored row it lands as a foreign slab with the row's fill left showing as a
+  // stub in the indent gutter. Instead the row itself shifts a step off its usual
+  // color while it is being edited (see `EDIT_SHIFT` in the script) and the box gets
+  // out of the way entirely — transparent, so the shifted fill and the watermark over
+  // it carry straight through, with a border to mark where the typing goes. The
+  // script publishes that border and a foreground that reads against the shifted
+  // color; the fallbacks leave rows we don't paint with the theme's own input look.
+  //
+  // This has to be applied from here rather than inline, because
+  // `InputBox.applyStyles()` rewrites its own inline colors on every validation pass
+  // and would win against a script that set them directly — `!important` from a
+  // stylesheet outranks any inline declaration. `caret-color` follows `color`, so the
+  // caret is lit by the same rule.
+  const editRow = 'body.fc-active .explorer-folders-view .monaco-list-row.fc-editing';
+  const editCss =
+    '\n/* Inline rename box: the row itself shifts, the box just marks the field. */\n' +
+    `${editRow} .monaco-inputbox {\n` +
+    '\tbackground-color: transparent !important;\n' +
+    '\tborder-color: transparent !important;\n' +
+    '\tcolor: var(--fc-edit-fg, var(--vscode-input-foreground)) !important;\n' +
+    '}\n' +
+    `${editRow} .monaco-inputbox input {\n` +
+    '\tbackground-color: var(--fc-edit-field, var(--vscode-input-background)) !important;\n' +
+    '\tcolor: var(--fc-edit-fg, var(--vscode-input-foreground)) !important;\n' +
+    '\toutline: 1px solid var(--fc-edit-border, var(--vscode-focusBorder)) !important;\n' +
+    '\toutline-offset: -1px !important;\n' +
+    '\tborder-radius: 3px;\n' +
+    '}\n';
 
-	// `body.fc-active` is set by the injected script only in a window whose workspace
-	// is configured, so this selected-label styling doesn't apply in other workspaces.
-	// Match only `.selected` (not a stale `.focused` row), and color the whole row
-	// contents — not just `.monaco-icon-label` — so a decoration badge stays this
-	// color. `.monaco-tl-twistie` (the expand/collapse chevron) is listed too.
-	// `.fc-editing` is set by the injected script on a row showing the inline rename
-	// box. Its `<input>` is inside `.monaco-tl-contents`, so an `!important` color
-	// here would apply to the text being typed — and to the caret, which follows
-	// `color` — leaving the rename invisible. Stand down for those rows.
-	// `.fc-sel` is set by the script on exactly the rows it painted a selection fill
-	// on. Without it this rule fires on every selected row in a configured workspace
-	// while the fill reaches only the ones inside a coloured folder — so a row outside
-	// one got this colour over the theme's own selection background, which is how a
-	// black label landed on a dark grey row.
-	// Neither the weight nor the color can be a literal here. This is one stylesheet
-	// shared by every window, and both come from per-workspace settings — writing
-	// this window's answer into it is what let one workspace's `"invert"` erase
-	// another's `"#ffffff"`. So the script decides per row: `.fc-sel-bold` and
-	// `.fc-sel-text` are set on exactly the rows it styled, and the color travels as
-	// `--fc-sel-fg`. A row it set neither on is not matched by either rule.
-	const row = 'body.fc-active .explorer-folders-view .monaco-list-row.selected.fc-sel:not(.fc-editing)';
-	const selectors = (marker: string): string => [
-		`${row}${marker} .monaco-tl-contents`,
-		`${row}${marker} .monaco-tl-contents *`,
-		`${row}${marker} .monaco-tl-twistie`,
-	].join(',\n');
+  // `body.fc-active` is set by the injected script only in a window whose workspace
+  // is configured, so this selected-label styling doesn't apply in other workspaces.
+  // Match only `.selected` (not a stale `.focused` row), and color the whole row
+  // contents — not just `.monaco-icon-label` — so a decoration badge stays this
+  // color. `.monaco-tl-twistie` (the expand/collapse chevron) is listed too.
+  // `.fc-editing` is set by the injected script on a row showing the inline rename
+  // box. Its `<input>` is inside `.monaco-tl-contents`, so an `!important` color
+  // here would apply to the text being typed — and to the caret, which follows
+  // `color` — leaving the rename invisible. Stand down for those rows.
+  // `.fc-sel` is set by the script on exactly the rows it painted a selection fill
+  // on. Without it this rule fires on every selected row in a configured workspace
+  // while the fill reaches only the ones inside a coloured folder — so a row outside
+  // one got this colour over the theme's own selection background, which is how a
+  // black label landed on a dark grey row.
+  // Neither the weight nor the color can be a literal here. This is one stylesheet
+  // shared by every window, and both come from per-workspace settings — writing
+  // this window's answer into it is what let one workspace's `"invert"` erase
+  // another's `"#ffffff"`. So the script decides per row: `.fc-sel-bold` and
+  // `.fc-sel-text` are set on exactly the rows it styled, and the color travels as
+  // `--fc-sel-fg`. A row it set neither on is not matched by either rule.
+  const row = 'body.fc-active .explorer-folders-view .monaco-list-row.selected.fc-sel:not(.fc-editing)';
+  const selectors = (marker: string): string => [
+    `${row}${marker} .monaco-tl-contents`,
+    `${row}${marker} .monaco-tl-contents *`,
+    `${row}${marker} .monaco-tl-twistie`,
+  ].join(',\n');
 
-	return header + editCss +
-		'\n/* Selected-row label + twistie. */\n' +
-		selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
-		selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n';
+  return header + editCss +
+    '\n/* Selected-row label + twistie. */\n' +
+    selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
+    selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n';
 }
 
 /** One workspace's selection settings, as the painter reads them. */
 interface SelectionOptions {
-	bg: string; shift: number; text: string; opacity: number; border: string;
-	inactiveDarken: number; overrides: string[]; watermark: string;
-	watermarkContrast: number; bold: boolean;
+  bg: string; shift: number; text: string; opacity: number; border: string;
+  inactiveDarken: number; overrides: string[]; watermark: string;
+  watermarkContrast: number; bold: boolean;
 }
 
 /** Persisted union: workspace-folder name (lowercased) -> that workspace's selection. */
@@ -549,26 +549,26 @@ type WorkspaceSelection = Record<string, SelectionOptions>;
 
 /** Config baked into the injected script as `globalThis.__premiumExplorerConfig`. */
 interface InjectedConfig {
-	/** Workspace-folder name (lowercased) -> folder name -> per-state colors. */
-	workspaces: Record<string, Record<string, FolderColors>>;
-	/** Same keys: the selection settings that workspace's own window generated. */
-	selections: WorkspaceSelection;
-	/** Used for a workspace that has colors in the union but no selection entry yet. */
-	selection: SelectionOptions;
+  /** Workspace-folder name (lowercased) -> folder name -> per-state colors. */
+  workspaces: Record<string, Record<string, FolderColors>>;
+  /** Same keys: the selection settings that workspace's own window generated. */
+  selections: WorkspaceSelection;
+  /** Used for a workspace that has colors in the union but no selection entry yet. */
+  selection: SelectionOptions;
 }
 
 /** Prepend the baked config to the static browser script (media/inject.js). */
 async function buildInjectedScript(
-	context: vscode.ExtensionContext,
-	injected: InjectedConfig,
+  context: vscode.ExtensionContext,
+  injected: InjectedConfig,
 ): Promise<string> {
-	const templateUri = vscode.Uri.joinPath(context.extensionUri, 'media', 'inject.js');
-	const template = Buffer.from(await vscode.workspace.fs.readFile(templateUri)).toString('utf8');
-	return (
-		'// Auto-generated by premium-explorer. Do not edit — regenerated from settings.\n' +
-		`globalThis.__premiumExplorerConfig = ${JSON.stringify(injected)};\n\n` +
-		template
-	);
+  const templateUri = vscode.Uri.joinPath(context.extensionUri, 'media', 'inject.js');
+  const template = Buffer.from(await vscode.workspace.fs.readFile(templateUri)).toString('utf8');
+  return (
+    '// Auto-generated by premium-explorer. Do not edit — regenerated from settings.\n' +
+    `globalThis.__premiumExplorerConfig = ${JSON.stringify(injected)};\n\n` +
+    template
+  );
 }
 
 /**
@@ -581,42 +581,42 @@ async function buildInjectedScript(
  * up themselves is left exactly where it is.
  */
 export async function addCustomCssImports(urls: string[]): Promise<void> {
-	const cfg = vscode.workspace.getConfiguration();
-	const current = cfg.get<string[]>(CUSTOM_CSS_IMPORTS) ?? [];
-	const next = current.filter((url) => !OURS.some((file) => url.endsWith('/' + file))).concat(urls);
-	const same = next.length === current.length && next.every((url, i) => url === current[i]);
-	if (!same) {
-		await cfg.update(CUSTOM_CSS_IMPORTS, next, vscode.ConfigurationTarget.Global);
-	}
+  const cfg = vscode.workspace.getConfiguration();
+  const current = cfg.get<string[]>(CUSTOM_CSS_IMPORTS) ?? [];
+  const next = current.filter((url) => !OURS.some((file) => url.endsWith('/' + file))).concat(urls);
+  const same = next.length === current.length && next.every((url, i) => url === current[i]);
+  if (!same) {
+    await cfg.update(CUSTOM_CSS_IMPORTS, next, vscode.ConfigurationTarget.Global);
+  }
 }
 
 /** `premium-explorer.generateBackgroundCss` command: write files + wire up imports. */
 export async function generateBackgroundCss(
-	context: vscode.ExtensionContext,
-	config: FolderColorerConfig,
+  context: vscode.ExtensionContext,
+  config: FolderColorerConfig,
 ): Promise<void> {
-	const result = await writeBackgroundFiles(context, config);
-	// Record which version wrote these, so the update check has a baseline.
-	await context.globalState.update(
-		GENERATED_VERSION_STATE,
-		String(context.extension?.packageJSON?.version ?? ''),
-	);
-	// vscode-custom-css can only read `file://` URLs. globalStorageUri's scheme is
-	// `vscode-userdata`, so convert via fsPath instead of using cssUri.toString().
-	await addCustomCssImports([
-		vscode.Uri.file(result.cssUri.fsPath).toString(),
-		vscode.Uri.file(result.jsUri.fsPath).toString(),
-	]);
-	if (result.count === 0) {
-		vscode.window.showWarningMessage(
-			'Premium Explorer: your rules matched no folders. Add a rule to "premiumExplorer.rules", e.g. { "path": ".", "engine": "git" }.',
-		);
-		return;
-	}
-	vscode.window.showInformationMessage(
-		`Premium Explorer: configured vscode-custom-css for ${result.count} folder(s). ` +
-		'Run "Reload Custom CSS and JS" and restart to apply.',
-	);
+  const result = await writeBackgroundFiles(context, config);
+  // Record which version wrote these, so the update check has a baseline.
+  await context.globalState.update(
+    GENERATED_VERSION_STATE,
+    String(context.extension?.packageJSON?.version ?? ''),
+  );
+  // vscode-custom-css can only read `file://` URLs. globalStorageUri's scheme is
+  // `vscode-userdata`, so convert via fsPath instead of using cssUri.toString().
+  await addCustomCssImports([
+    vscode.Uri.file(result.cssUri.fsPath).toString(),
+    vscode.Uri.file(result.jsUri.fsPath).toString(),
+  ]);
+  if (result.count === 0) {
+    vscode.window.showWarningMessage(
+      'Premium Explorer: your rules matched no folders. Add a rule to "premiumExplorer.rules", e.g. { "path": ".", "engine": "git" }.',
+    );
+    return;
+  }
+  vscode.window.showInformationMessage(
+    `Premium Explorer: configured vscode-custom-css for ${result.count} folder(s). ` +
+    'Run "Reload Custom CSS and JS" and restart to apply.',
+  );
 }
 
 /**
@@ -625,23 +625,23 @@ export async function generateBackgroundCss(
  * needed.
  */
 export async function regenerateIfConfigured(
-	context: vscode.ExtensionContext,
-	config: FolderColorerConfig,
+  context: vscode.ExtensionContext,
+  config: FolderColorerConfig,
 ): Promise<void> {
-	const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
-	try {
-		await vscode.workspace.fs.stat(cssUri);
-	} catch {
-		return; // not set up yet — nothing to keep in sync
-	}
-	await writeBackgroundFiles(context, config);
-	const choice = await vscode.window.showInformationMessage(
-		'Premium Explorer: background styles updated. Reload to apply.',
-		'Reload Window',
-	);
-	if (choice === 'Reload Window') {
-		await vscode.commands.executeCommand('workbench.action.reloadWindow');
-	}
+  const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
+  try {
+    await vscode.workspace.fs.stat(cssUri);
+  } catch {
+    return; // not set up yet — nothing to keep in sync
+  }
+  await writeBackgroundFiles(context, config);
+  const choice = await vscode.window.showInformationMessage(
+    'Premium Explorer: background styles updated. Reload to apply.',
+    'Reload Window',
+  );
+  if (choice === 'Reload Window') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
 }
 
 /**
@@ -656,28 +656,28 @@ export async function regenerateIfConfigured(
  * refreshing when it moves, is what makes an update actually take effect.
  */
 export async function regenerateIfStale(
-	context: vscode.ExtensionContext,
-	config: FolderColorerConfig,
+  context: vscode.ExtensionContext,
+  config: FolderColorerConfig,
 ): Promise<void> {
-	const version = String(context.extension?.packageJSON?.version ?? '');
-	if (!version || context.globalState.get<string>(GENERATED_VERSION_STATE) === version) {
-		return;
-	}
-	const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
-	try {
-		await vscode.workspace.fs.stat(cssUri);
-	} catch {
-		// Never generated, so there is nothing stale to refresh. Leave the stamp unset
-		// too: the first real generate should be the thing that records a version.
-		return;
-	}
-	await writeBackgroundFiles(context, config);
-	await context.globalState.update(GENERATED_VERSION_STATE, version);
-	const choice = await vscode.window.showInformationMessage(
-		`Premium Explorer ${version}: regenerated the injected files. Reload to apply.`,
-		'Reload Window',
-	);
-	if (choice === 'Reload Window') {
-		await vscode.commands.executeCommand('workbench.action.reloadWindow');
-	}
+  const version = String(context.extension?.packageJSON?.version ?? '');
+  if (!version || context.globalState.get<string>(GENERATED_VERSION_STATE) === version) {
+    return;
+  }
+  const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
+  try {
+    await vscode.workspace.fs.stat(cssUri);
+  } catch {
+    // Never generated, so there is nothing stale to refresh. Leave the stamp unset
+    // too: the first real generate should be the thing that records a version.
+    return;
+  }
+  await writeBackgroundFiles(context, config);
+  await context.globalState.update(GENERATED_VERSION_STATE, version);
+  const choice = await vscode.window.showInformationMessage(
+    `Premium Explorer ${version}: regenerated the injected files. Reload to apply.`,
+    'Reload Window',
+  );
+  if (choice === 'Reload Window') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
 }
