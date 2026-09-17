@@ -1,4 +1,4 @@
-// premium-explorer — injected into the VS Code workbench by be5invis.vscode-custom-css.
+// premium-explorer — injected into the VS Code workbench by the extension's own patch.
 //
 // Paints Explorer row backgrounds for Git repositories and everything inside them,
 // plus a per-repo hover shade and a selection highlight. It walks the Explorer

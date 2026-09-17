@@ -152,8 +152,8 @@ every write in `inject.js` must stay inline and `data-fc-*`-tracked.
 ## Cross-cutting caveats
 
 These are UI concepts, and the extension's real rendering surface is generated
-CSS injected through `be5invis.vscode-custom-css` — so two invariants bound all
-four:
+CSS injected into the workbench by the extension's own patch — so two invariants
+bound all four:
 
 - **Folders are matched by *name*, not path, in the browser.** The DOM has no
   paths, so two same-named folders in one workspace share a mark and a colour.

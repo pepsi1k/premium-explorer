@@ -6,7 +6,7 @@
  */
 import * as vscode from 'vscode';
 import { FolderColorerConfig } from './config';
-import { addCustomCssImports, writeBackgroundFiles } from './backgroundStyles';
+import { unwireCustomCssImports, writeBackgroundFiles } from './backgroundStyles';
 import { PatchError, apply, inspect, remove } from './workbenchPatch';
 
 /** Set once the user opts in, so a patch lost to a VS Code update can be offered back. */
@@ -37,14 +37,15 @@ export async function enableInjection(
   }
 
   await context.globalState.update(INJECTION_STATE, true);
-  // Both injectors loading the same script would paint every row twice, so drop
-  // our entries from vscode-custom-css. Anything the user added themselves stays.
-  await addCustomCssImports([]);
+  // Migration: users who were on the old vscode-custom-css path still have our
+  // files in its import list, and both injectors loading the same script would
+  // paint every row twice. Anything the user added themselves stays.
+  await unwireCustomCssImports();
 
   if (status.customCss) {
     vscode.window.showWarningMessage(
       'Premium Explorer: vscode-custom-css has also patched this workbench. ' +
-      'Premium Explorer no longer needs it — if nothing else depends on it, run ' +
+      'Premium Explorer does not need it — if nothing else depends on it, run ' +
       '"Reload Custom CSS and JS" after uninstalling it to clean up its patch.',
     );
   }

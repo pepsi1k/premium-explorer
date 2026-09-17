@@ -1,10 +1,12 @@
 /**
- * Generates the CSS + JS files consumed by the `be5invis.vscode-custom-css`
- * extension to paint Explorer **backgrounds** — something the VS Code API cannot
- * do. The JS (media/inject.js) walks the Explorer DOM and paints each colored
- * folder plus everything inside it; this module resolves the rules into the set
- * of colored folders and bakes their composable layers (background/edge/pill/text)
- * plus selection options into that script. See README.md for the full rationale.
+ * Generates the CSS + JS pair the workbench loads to paint Explorer
+ * **backgrounds** — something the VS Code API cannot do. The JS
+ * (media/inject.js) walks the Explorer DOM and paints each colored folder plus
+ * everything inside it; this module resolves the rules into the set of colored
+ * folders and bakes their composable layers (background/edge/pill/text) plus
+ * selection options into that script. [injection.ts](src/injection.ts) is what
+ * gets the pair loaded, by patching `workbench.html`. See README.md for the full
+ * rationale.
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -20,7 +22,20 @@ const CSS_FILE = 'premium-explorer.css';
 const JS_FILE = 'premium-explorer.js';
 /** Generated pairs we own, including the one shipped under the extension's old name. */
 const OURS = [CSS_FILE, JS_FILE, 'premium-stash.css', 'premium-stash.js'];
+/**
+ * Legacy: until 2.1.0 the pair could also be delivered by `be5invis.vscode-custom-css`,
+ * which reads this settings key. Nothing writes imports here any more — the key is
+ * kept only so {@link unwireCustomCssImports} can take ours back out of a list left
+ * over from that path. See the extension id below for why even that has to be guarded.
+ */
 const CUSTOM_CSS_IMPORTS = 'vscode_custom_css.imports';
+/**
+ * The extension that owns {@link CUSTOM_CSS_IMPORTS}. That key is only a *registered*
+ * configuration while this is installed; writing to it otherwise is rejected by
+ * VS Code ("not a registered configuration"), which is what made the old command
+ * fail outright on a fresh install.
+ */
+const CUSTOM_CSS_EXTENSION = 'be5invis.vscode-custom-css';
 
 // Watermark artwork shipped in the box, relative to the extension root. A file
 // dropped in here is addressable by its bare filename — `assets/svg/docker.svg`
@@ -67,9 +82,9 @@ export async function writeBackgroundFiles(
   context: vscode.ExtensionContext,
   config: FolderColorerConfig,
 ): Promise<GeneratedFiles> {
-  // When disabled, write inert files. vscode-custom-css loads these files
-  // independently of the extension, so `premiumExplorer.enabled` has to clear them
-  // here — otherwise the last-generated backgrounds/selection keep painting.
+  // When disabled, write inert files. The workbench loads these files independently
+  // of the extension, so `premiumExplorer.enabled` has to clear them here —
+  // otherwise the last-generated backgrounds/selection keep painting.
   if (!config.enabled) {
     return writeFiles(context,
       '/* premium-explorer disabled (premiumExplorer.enabled = false). */\n',
@@ -190,11 +205,10 @@ function mergeWorkspaceSelection(
 /**
  * Write the CSS + JS into global storage and return their URIs.
  *
- * Global storage stays the source of truth: it is what a vscode-custom-css setup
- * imports, and what the workbench patch copies from. Refreshing the patched copy
- * here means every caller that regenerates — a settings change, an extension
- * update, the command run by hand — keeps whichever consumer is live in step
- * without having to know which one that is.
+ * Global storage stays the source of truth, and the workbench patch copies from
+ * it. Refreshing the patched copy here means every caller that regenerates — a
+ * settings change, an extension update, the command run by hand — keeps the live
+ * copy in step without having to know the patch exists.
  */
 async function writeFiles(
   context: vscode.ExtensionContext,
@@ -207,6 +221,13 @@ async function writeFiles(
   const jsUri = vscode.Uri.joinPath(context.globalStorageUri, JS_FILE);
   await vscode.workspace.fs.writeFile(cssUri, Buffer.from(css, 'utf8'));
   await vscode.workspace.fs.writeFile(jsUri, Buffer.from(js, 'utf8'));
+  // Stamp which version wrote these, so regenerateIfStale() has a baseline. Doing
+  // it here keeps the stamp describing the files actually on disk, whichever
+  // caller produced them.
+  await context.globalState.update(
+    GENERATED_VERSION_STATE,
+    String(context.extension?.packageJSON?.version ?? ''),
+  );
   mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath);
   return { cssUri, jsUri, count };
 }
@@ -214,9 +235,9 @@ async function writeFiles(
 /**
  * Refresh the patched workbench's copy of the pair, if we are the one painting.
  *
- * Deliberately silent on failure. Regenerating has to keep working for someone on
- * the vscode-custom-css path, and a patch that a VS Code update has wiped is worth
- * one prompt on activation — not a warning every time a setting moves.
+ * Deliberately silent on failure. Regenerating has to keep working for someone who
+ * has never turned painting on, and a patch that a VS Code update has wiped is
+ * worth one prompt on activation — not a warning every time a setting moves.
  */
 function mirrorToWorkbench(css: string, js: string): void {
   const status = inspectWorkbench();
@@ -471,7 +492,7 @@ function bakeAll(colored: ColoredFolder[]): Map<string, FolderColors> {
  */
 function buildCss(): string {
   const header =
-    '/* Auto-generated by premium-explorer for be5invis.vscode-custom-css. */\n' +
+    '/* Auto-generated by premium-explorer. Do not edit — regenerated from settings. */\n' +
     '/* Backgrounds, hover and selection are painted by premium-explorer.js. */\n';
 
   // The inline rename box. VS Code paints it with the theme's own input colors, so on
@@ -572,51 +593,31 @@ async function buildInjectedScript(
 }
 
 /**
- * Point the vscode-custom-css imports list at our current generated files.
+ * Take our entries back out of a leftover `vscode_custom_css.imports` list.
  *
- * Any import of ours already in the list is dropped first, so a pair left behind
- * at a path we no longer write to — global storage is keyed on the extension id,
- * so renaming the extension moves it — can't be inlined alongside the live pair
- * and leave two painters fighting over the same rows. Everything the user wired
- * up themselves is left exactly where it is.
+ * Premium Explorer loads the pair itself now, so this is a one-way cleanup for
+ * users migrating off the old delivery path: two injectors loading the same
+ * script would paint every row twice. It removes only filenames in {@link OURS}
+ * (including the pair shipped under the extension's old `premium-stash` name, and
+ * any copy at a global-storage path we no longer write to — that directory is
+ * keyed on the extension id, so renaming the extension moves it). Everything the
+ * user wired up themselves is left exactly where it is.
+ *
+ * Silent when there is nothing to do, including when vscode-custom-css isn't
+ * installed: the key is only a *registered* configuration while it is, so the
+ * write would be rejected — and a list with no reader is not worth an error.
  */
-export async function addCustomCssImports(urls: string[]): Promise<void> {
+export async function unwireCustomCssImports(): Promise<void> {
   const cfg = vscode.workspace.getConfiguration();
   const current = cfg.get<string[]>(CUSTOM_CSS_IMPORTS) ?? [];
-  const next = current.filter((url) => !OURS.some((file) => url.endsWith('/' + file))).concat(urls);
-  const same = next.length === current.length && next.every((url, i) => url === current[i]);
-  if (!same) {
-    await cfg.update(CUSTOM_CSS_IMPORTS, next, vscode.ConfigurationTarget.Global);
-  }
-}
-
-/** `premium-explorer.generateBackgroundCss` command: write files + wire up imports. */
-export async function generateBackgroundCss(
-  context: vscode.ExtensionContext,
-  config: FolderColorerConfig,
-): Promise<void> {
-  const result = await writeBackgroundFiles(context, config);
-  // Record which version wrote these, so the update check has a baseline.
-  await context.globalState.update(
-    GENERATED_VERSION_STATE,
-    String(context.extension?.packageJSON?.version ?? ''),
-  );
-  // vscode-custom-css can only read `file://` URLs. globalStorageUri's scheme is
-  // `vscode-userdata`, so convert via fsPath instead of using cssUri.toString().
-  await addCustomCssImports([
-    vscode.Uri.file(result.cssUri.fsPath).toString(),
-    vscode.Uri.file(result.jsUri.fsPath).toString(),
-  ]);
-  if (result.count === 0) {
-    vscode.window.showWarningMessage(
-      'Premium Explorer: your rules matched no folders. Add a rule to "premiumExplorer.rules", e.g. { "path": ".", "engine": "git" }.',
-    );
+  const next = current.filter((url) => !OURS.some((file) => url.endsWith('/' + file)));
+  if (next.length === current.length) {
     return;
   }
-  vscode.window.showInformationMessage(
-    `Premium Explorer: configured vscode-custom-css for ${result.count} folder(s). ` +
-    'Run "Reload Custom CSS and JS" and restart to apply.',
-  );
+  if (!vscode.extensions.getExtension(CUSTOM_CSS_EXTENSION)) {
+    return;
+  }
+  await cfg.update(CUSTOM_CSS_IMPORTS, next, vscode.ConfigurationTarget.Global);
 }
 
 /**
@@ -671,8 +672,7 @@ export async function regenerateIfStale(
     // too: the first real generate should be the thing that records a version.
     return;
   }
-  await writeBackgroundFiles(context, config);
-  await context.globalState.update(GENERATED_VERSION_STATE, version);
+  await writeBackgroundFiles(context, config); // stamps GENERATED_VERSION_STATE
   const choice = await vscode.window.showInformationMessage(
     `Premium Explorer ${version}: regenerated the injected files. Reload to apply.`,
     'Reload Window',

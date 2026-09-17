@@ -10,7 +10,7 @@
 import * as vscode from 'vscode';
 import { CONFIG_SECTION, readConfig } from './config';
 import { FolderColorerProvider } from './decorationProvider';
-import { generateBackgroundCss, regenerateIfConfigured, regenerateIfStale } from './backgroundStyles';
+import { regenerateIfConfigured, regenerateIfStale } from './backgroundStyles';
 import { disableInjection, enableInjection, restoreInjectionIfLost } from './injection';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -22,7 +22,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerFileDecorationProvider(provider),
   );
 
-  // Re-read settings, refresh decorations, and (if the custom-css files already
+  // Re-read settings, refresh decorations, and (if the generated files already
   // exist) regenerate them.
   const reload = async (regenerate: boolean): Promise<void> => {
     config = readConfig();
@@ -58,9 +58,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
-    vscode.commands.registerCommand('premium-explorer.generateBackgroundCss', () =>
-      generateBackgroundCss(context, config),
-    ),
     vscode.commands.registerCommand('premium-explorer.enableInjection', () =>
       enableInjection(context, config),
     ),

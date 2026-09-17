@@ -54,9 +54,9 @@ Premium Explorer therefore works in two halves:
    and applies the pre-computed values to each row.
 
 Step 2 is the part VS Code doesn't sanction: the only way into the workbench is to
-edit what it loads from disk. Premium Explorer can do that itself, or leave it to
-`be5invis.vscode-custom-css`. **Until you turn painting on you get the badge and
-nothing else** — every colour, bar, pill and watermark comes from the injected pair.
+edit what it loads from disk. Premium Explorer does that itself — **no companion
+extension required**. **Until you turn painting on you get the badge and nothing
+else**: every colour, bar, pill and watermark comes from the injected pair.
 
 ## Turning on background painting
 
@@ -95,19 +95,22 @@ Content Security Policy is left intact (custom-css deletes it), and the tags abo
 *reference* the generated files rather than carrying their contents, so changing a
 setting rewrites only those two files and never revisits `workbench.html`.
 
-### Using vscode-custom-css instead
+### Coming from vscode-custom-css
 
-Still supported. Install
-[`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css),
-run **Premium Explorer: Generate Background CSS (for vscode-custom-css)** — which
-writes the pair and adds it to `vscode_custom_css.imports` — then run **Reload
-Custom CSS and JS** and restart. Don't enable both: two copies of the script would
-paint every row twice. Enabling Premium Explorer's own painting removes its entries
-from `vscode_custom_css.imports` for you.
+Earlier versions could hand the generated pair to
+[`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css)
+instead. That path is gone as of 2.1.0 — Premium Explorer needs no second extension
+— and **Generate Background CSS (for vscode-custom-css)** no longer exists.
 
-Either way, editing any `premiumExplorer.*` setting regenerates the files and offers
-a **Reload Window** button. After cloning or removing repositories, re-run the
-generate (or enable) command so the new folders are picked up.
+If you were on it, just run **Enable Background Painting**. It takes Premium
+Explorer's own entries back out of `vscode_custom_css.imports` on the way (two
+copies of the script would paint every row twice); anything you added there
+yourself is left alone. vscode-custom-css itself is then yours to keep or
+uninstall.
+
+Editing any `premiumExplorer.*` setting regenerates the files and offers a **Reload
+Window** button. After cloning or removing repositories, re-run **Enable Background
+Painting** so the new folders are picked up.
 
 **Multiple workspaces:** the generated files are a single global set shared by
 every window, but colors are scoped **per workspace** — the injected script only
@@ -166,8 +169,6 @@ doesn't inherit another one's colors. Within one workspace, folders are matched 
 - **Premium Explorer: Disable Background Painting (Restore Workbench)** — undo that
   patch and remove the files it added.
 - **Premium Explorer: Refresh Decorations** — re-read settings and re-apply.
-- **Premium Explorer: Generate Background CSS (for vscode-custom-css)** — (re)write
-  the background files and wire up `vscode_custom_css.imports` instead.
 
 ## Architecture
 
@@ -206,7 +207,6 @@ pnpm run package    # type-check + lint + production bundle
 Before `vsce publish`, set in `package.json`:
 
 - `publisher` — your VS Marketplace publisher id. **Note:** this changes the
-  extension's storage path, so re-run **Generate Background CSS** and update your
-  `vscode_custom_css.imports` afterward.
+  extension's storage path, so re-run **Enable Background Painting** afterward.
 - `icon` — path to a 128×128 PNG.
 - `repository` / `bugs` / `homepage` — once the repo is hosted.

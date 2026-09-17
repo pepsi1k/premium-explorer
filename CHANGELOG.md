@@ -3,6 +3,35 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.0] - 2026-09-17
+
+### Removed
+- **The `be5invis.vscode-custom-css` delivery path, and with it the command
+  "Premium Explorer: Generate Background CSS (for vscode-custom-css)".** Premium
+  Explorer patches the workbench itself and needs no companion extension, so
+  there is now one way to turn painting on: **Enable Background Painting**.
+
+  This also fixes [#1](https://github.com/pepsi1k/premium-explorer/issues/1). On a
+  machine without vscode-custom-css the removed command failed outright with
+  *"Unable to write to User Settings because vscode_custom_css.imports is not a
+  registered configuration"* — that key only exists while that extension is
+  installed. The same unguarded write sat in **Enable Background Painting** too,
+  where it would have thrown *after* the workbench was already patched.
+
+### Changed
+- If you were on the vscode-custom-css path, running **Enable Background
+  Painting** takes Premium Explorer's own entries back out of
+  `vscode_custom_css.imports` as it goes, so the script isn't loaded twice and
+  every row painted twice. Entries you added yourself are left alone, and the
+  cleanup is skipped silently when that extension isn't installed.
+
+### Fixed
+- The version stamp that decides whether an extension update needs to regenerate
+  the injected files is now written whenever those files are written. Previously
+  only the removed command recorded it, so enabling painting left it unset and the
+  next window launch showed a spurious "regenerated the injected files, reload to
+  apply" prompt.
+
 ## [2.0.1] - 2026-09-17
 
 ### Changed

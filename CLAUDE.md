@@ -39,11 +39,13 @@ so the real output is a **generated CSS + JS pair** written into the extension's
 `globalStorageUri` and loaded by the workbench. Nothing renders until the user
 turns painting on and reloads.
 
-There are two ways that pair reaches the workbench, and both are supported:
-[workbenchPatch.ts](src/workbenchPatch.ts) patching `workbench.html` ourselves
-(**Premium Explorer: Enable Background Painting**), or the third-party
-`be5invis.vscode-custom-css` (**Generate Background CSS**). They must not both be
-active — two copies of the script paint every row twice.
+That pair reaches the workbench one way: [workbenchPatch.ts](src/workbenchPatch.ts)
+patching `workbench.html` ourselves (**Premium Explorer: Enable Background
+Painting**). **The extension is self-sufficient — no companion extension.** Before
+2.1.0 the pair could also be handed to `be5invis.vscode-custom-css`; that path and
+its **Generate Background CSS** command are gone, and all that survives is
+`unwireCustomCssImports()`, a one-way cleanup so a migrating user doesn't end up
+with two copies of the script painting every row twice.
 
 Generate-time pipeline, all triggered from
 [extension.ts](src/extension.ts) on activation, settings change, workspace-folder
@@ -66,9 +68,8 @@ change, or a `**/.git` watcher event:
    **prepended verbatim** to the static [media/inject.js](media/inject.js), which
    is written alongside a small CSS file (the CSS covers only what inline styles
    can't reach: the selected label and the inline rename box).
-5. The pair is delivered: `writeFiles()` mirrors it into the patched workbench
-   directory when we own the patch, and `addCustomCssImports()` rewrites
-   `vscode_custom_css.imports` when the user is on that path instead.
+5. The pair is delivered: `writeFiles()` writes it to global storage, stamps the
+   version that wrote it, and mirrors it into the patched workbench directory.
 
 [colors.ts](src/colors.ts) and [workbenchPatch.ts](src/workbenchPatch.ts) are pure
 (no `vscode` import): the first does hashing, hex/rgba math, stripe gradients and
@@ -101,9 +102,8 @@ with every message and prompt left to [injection.ts](src/injection.ts).
   a `data-fc-*` marker, both to avoid `MutationObserver` write loops and to never
   clear styling that isn't ours.
 - **`premiumExplorer.enabled: false` must write inert files.** The workbench loads
-  the generated pair independently of the extension — whether by our patch or by
-  vscode-custom-css — so disabling has to actively blank them, or the
-  last-generated colors keep painting.
+  the generated pair independently of the extension, so disabling has to actively
+  blank them, or the last-generated colors keep painting.
 - **The workbench patch names files; it never carries them.** The tags injected
   into `workbench.html` reference `./premium-explorer.{css,js}` in the same
   directory, so regenerating means rewriting those two files (`writeFiles()` does
@@ -156,9 +156,17 @@ time, so **dropping a file in is the whole code change**. Two things to know:
   which directory is live and the old imports keep pointing at the dead one.
 - **`regenerateIfConfigured()` stats the CSS file and returns early if absent**, so
   settings changes regenerate nothing until the command has been run once.
-- `addCustomCssImports()` only prunes filenames in its own `OURS` list (which
-  includes the extension's old `premium-stash.*` names); anything else in the
-  user's import list is left alone.
+- **`vscode_custom_css.imports` only exists while `be5invis.vscode-custom-css` is
+  installed**, and writing to an unregistered configuration key throws — that is
+  what made the old **Generate Background CSS** command fail outright on a fresh
+  install (issue #1). `unwireCustomCssImports()` is the only thing left that touches
+  the key: it checks the extension is present, removes only filenames in its own
+  `OURS` list (which includes the extension's old `premium-stash.*` names), never
+  adds any, and stays silent when there is nothing to do.
+- **`writeFiles()` stamps `GENERATED_VERSION_STATE` on every write**, so the
+  "regenerate after an update" check always has a baseline. Generating without
+  stamping means `regenerateIfStale()` fires a spurious reload prompt on the next
+  activation.
 - Settings files are JSONC — never read-parse-rewrite them, it destroys comments.
 - Commits in this repo are GPG-signed (`commit.gpgsign = true`). If signing fails,
   hand the commit to the user rather than reaching for `--no-gpg-sign`.
