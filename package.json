@@ -1,10 +1,10 @@
 {
   "name": "premium-explorer",
   "publisher": "pepsik",
-  "icon": "assets/logo/logo-512.png",
+  "icon": "assets/logo/png/logo-edge-ondark-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,4 +1,4 @@
 - [x] convert tabs -> 2 spaces on all typescript files
-- [] update icons, /desing-sync
-- [] rename releases in github, or just remove old ones
+- [x] with access to gtihub, you have to remove all releases expect 2.0.0
+- [x] update icons with /desing-sync pull, use assets to update icon
 - [] write all requirements
