@@ -270,14 +270,18 @@ async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot:
         continue; // masked by a more specific manual rule
       }
       const name = path.basename(repo.fsPath);
-      if (!byName.has(name)) {
-        const hex = gitRepoColorHex(config, repo);
-        byName.set(name, {
-          name, hex, absPath: repo.fsPath,
-          ...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
-          ...mergedParts(rule, config),
-        });
+      if (byName.has(name)) {
+        continue;
       }
+      if (isSymlink(repo.fsPath) && config.symlinkStyle === 'none') {
+        continue;
+      }
+      const hex = gitRepoColorHex(config, repo);
+      byName.set(name, {
+        name, hex, absPath: repo.fsPath,
+        ...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
+        ...symlinkAdjusted(config, repo.fsPath, mergedParts(rule, config)),
+      });
     }
   }
 
@@ -286,16 +290,55 @@ async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot:
   // its own `*Color` is empty. Set those per layer to color a folder deliberately.
   for (const rule of config.rules) {
     if (rule.engine !== 'git') {
+      if (isSymlink(rule.absPath) && config.symlinkStyle === 'none') {
+        continue;
+      }
       const name = path.basename(rule.absPath);
       byName.set(name, {
         name, hex: config.defaultColor, absPath: rule.absPath,
         ...identityOf(config, name, rule.absPath, config.defaultColor, extensionRoot, rule.backgroundWatermarkSymbol),
-        ...mergedParts(rule, config),
+        ...symlinkAdjusted(config, rule.absPath, mergedParts(rule, config)),
       });
     }
   }
 
   return [...byName.values()];
+}
+
+/** Is this path (not any ancestor) itself a symlink? Missing/unreadable = no. */
+function isSymlink(absPath: string): boolean {
+  try {
+    return fs.lstatSync(absPath).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/** How much a symlinked folder's fill/pill layers are dimmed under `symlinkStyle: "dim"`. */
+const SYMLINK_OPACITY_FACTOR = 0.55;
+
+/**
+ * A symlink only reaches here when a rule names its path *and* the user opted into
+ * painting it at all (`none` is the default and drops it before this). Under `dim`
+ * it would otherwise be painted exactly like the folder it points at, so the fill
+ * and pill keep the colour the rule gave them and lose the brightness — the row
+ * still reads as that rule's folder while looking like the link it is. Nothing else
+ * is touched: a layer the config leaves off stays off.
+ */
+function symlinkAdjusted(
+  config: FolderColorerConfig,
+  absPath: string,
+  parts: { root: PartConfig; inner: PartConfig },
+): { root: PartConfig; inner: PartConfig } {
+  if (config.symlinkStyle !== 'dim' || !isSymlink(absPath)) {
+    return parts;
+  }
+  const dim = (p: PartConfig): PartConfig => ({
+    ...p,
+    backgroundOpacity: p.backgroundOpacity * SYMLINK_OPACITY_FACTOR,
+    pillOpacity: p.pillOpacity * SYMLINK_OPACITY_FACTOR,
+  });
+  return { root: dim(parts.root), inner: dim(parts.inner) };
 }
 
 /**

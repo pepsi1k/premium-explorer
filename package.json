@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -1175,6 +1175,21 @@
           ],
           "default": "name",
           "description": "What to hash when picking an automatic color for a Git repository folder."
+        },
+        "premiumExplorer.symlinkFolders": {
+          "type": "string",
+          "enum": [
+            "none",
+            "dim",
+            "normal"
+          ],
+          "enumDescriptions": [
+            "Leave it unpainted, even though a rule names it.",
+            "Paint it in its rule's color but dimmer, so it reads as a link rather than as the folder it points at.",
+            "Paint it exactly like a real folder — no way to tell them apart on screen."
+          ],
+          "default": "none",
+          "markdownDescription": "How a folder that is **itself a symlink** is painted when a rule names its path. Symlinks are otherwise never colored: a `git` rule does not descend into them while discovering repositories, so a repo is not found — and colored — twice under two different paths. A symlink *inside* a colored folder is still painted like any other row in that folder, and is not covered by this setting."
         },
         "premiumExplorer.badge": {
           "type": "string",

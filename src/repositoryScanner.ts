@@ -28,6 +28,12 @@ export async function findRepositories(root: vscode.Uri): Promise<vscode.Uri[]> 
       results.push(dir);
     }
     for (const [name, type] of entries) {
+      // Don't follow symlinks: a repo reachable only through one would be found
+      // (and colored) twice — once at its real location, once through the link —
+      // and a link back up the tree would recurse forever.
+      if (type & vscode.FileType.SymbolicLink) {
+        continue;
+      }
       if ((type & vscode.FileType.Directory) && !SKIP_DIRECTORIES.has(name)) {
         await walk(vscode.Uri.joinPath(dir, name), depth + 1);
       }

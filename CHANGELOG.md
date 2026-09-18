@@ -3,6 +3,20 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.2] - 2026-09-18
+
+### Fixed
+- **Symlinked directories are no longer colored on their own.** A `git` rule no
+  longer follows symlinks while discovering repositories, so a repo reachable
+  both through a link and at its real path is no longer found — and colored —
+  twice. A symlink is now painted in only two cases: a rule names its path, or
+  it sits inside a colored folder like any other row.
+- A folder that is itself a symlink is left unpainted even when a rule names its
+  path, since it would otherwise be indistinguishable from the folder it points
+  at. New `premiumExplorer.symlinkFolders` setting opts back in: `"dim"` paints it
+  in the rule's color but dimmer, `"normal"` paints it like a real folder,
+  `"none"` (the default) leaves it alone.
+
 ## [2.1.1] - 2026-09-18
 
 ### Fixed

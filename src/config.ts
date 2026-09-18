@@ -31,6 +31,20 @@ export const DEFAULT_PALETTE = [
 export type Engine = 'git' | 'manual';
 
 /**
+ * How a folder that is **itself** a symlink is painted when a rule names its path.
+ * It would otherwise be indistinguishable from the folder it points at, so it is
+ * left alone unless the user asks for it.
+ *   `none`   — never painted, even though a rule names it (the default).
+ *   `dim`    — painted in the rule's color but dimmer, so it reads as a link.
+ *   `normal` — painted exactly like a real folder.
+ */
+export type SymlinkStyle = 'none' | 'dim' | 'normal';
+const SYMLINK_STYLES: readonly SymlinkStyle[] = ['none', 'dim', 'normal'];
+function parseSymlinkStyle(value: unknown): SymlinkStyle | undefined {
+  return SYMLINK_STYLES.includes(value as SymlinkStyle) ? value as SymlinkStyle : undefined;
+}
+
+/**
  * How a fill layer (background/edge/pill) is drawn:
  *   - `none`    — not painted at all (bare VS Code styling);
  *   - `solid`   — painted with this layer's own color;
@@ -221,6 +235,7 @@ const SELECTED_OVERRIDES: readonly string[] = ['background', 'watermarks', 'text
 export interface FolderColorerConfig {
   enabled: boolean;
   colorBy: 'name' | 'path';
+  symlinkStyle: SymlinkStyle;
   badge?: string;
   palette: string[];
   defaultColor: string;
@@ -350,6 +365,7 @@ export function readConfig(): FolderColorerConfig {
   return {
     enabled: cfg.get<boolean>('enabled', true),
     colorBy: cfg.get<'name' | 'path'>('colorBy', 'name'),
+    symlinkStyle: parseSymlinkStyle(cfg.get<string>('symlinkFolders')) ?? 'none',
     badge: badge || undefined,
     palette: resolvePalette(cfg),
     defaultColor,

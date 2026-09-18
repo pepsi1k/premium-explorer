@@ -156,6 +156,20 @@ time, so **dropping a file in is the whole code change**. Two things to know:
   which directory is live and the old imports keep pointing at the dead one.
 - **`regenerateIfConfigured()` stats the CSS file and returns early if absent**, so
   settings changes regenerate nothing until the command has been run once.
+- **Nothing discovers a symlink; only a rule that names one reaches it.**
+  `findRepositories()` in [repositoryScanner.ts](src/repositoryScanner.ts) never
+  descends into a symlinked directory — that avoids finding (and coloring) one repo
+  twice, and avoids looping on a link back up the tree. So the only symlinked
+  folders left are the ones a rule names by path, and
+  [backgroundStyles.ts](src/backgroundStyles.ts) drops those too unless
+  `premiumExplorer.symlinkFolders` opts in (default `"none"`); `"dim"` keeps them
+  at reduced opacity via `symlinkAdjusted()`, which changes opacity only, so a
+  layer the config left off stays off. A symlink *inside* a colored folder is
+  painted by ancestry in the browser and never passes through any of this.
+- **Symlink-ness cannot beat name matching.** The check is `fs.lstatSync` on the
+  rule's own `absPath`, host-side. The painter matches rows by *name*, so a
+  symlink sharing a name with a colored real folder still gets that folder's
+  colors — there is no per-row path in the DOM to tell them apart.
 - **`vscode_custom_css.imports` only exists while `be5invis.vscode-custom-css` is
   installed**, and writing to an unregistered configuration key throws — that is
   what made the old **Generate Background CSS** command fail outright on a fresh
