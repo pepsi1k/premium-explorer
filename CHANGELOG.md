@@ -3,6 +3,19 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.4] - 2026-09-23
+
+### Fixed
+- **A colored folder could vanish entirely if this machine had ever generated the
+  injected file for a *different* workspace whose folder name collided with an
+  ordinary subfolder in the current one** (introduced in 2.1.3's path-matching
+  fix). Multi-root detection worked by testing whether a level-1 row's name
+  matched any key in the cross-session color union — including keys left over
+  from other windows — so an ordinary child folder named e.g. `idp` could be
+  mistaken for a workspace root and misroute every lookup beneath it. Detection
+  now reads VS Code's own `rootfolder-icon` marker on the row instead, which only
+  ever appears on an actual workspace-folder root.
+
 ## [2.1.3] - 2026-09-23
 
 ### Fixed
