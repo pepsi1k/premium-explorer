@@ -3,6 +3,22 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.3] - 2026-09-23
+
+### Fixed
+- **A rule now paints the folder it names, and only that folder.** Rows were
+  matched by bare folder *name*, so `{ "path": "./idp/gitops" }` also painted
+  `idp/pulumi/projects/gitops` and `idp/gitops/infra/gitops` — each of them twice
+  over, once in the color inherited from its real parent and again in the rule's.
+  The injected painter now rebuilds each row's path from the `aria-level` chain it
+  already walks and matches it against paths relative to the workspace folder, so
+  same-named folders in different places keep their own colors. Where the list is
+  scrolled past the top of the tree and the outer ancestors are not rendered at
+  all, a row is matched on the tail of its path plus its depth, and is left
+  unpainted rather than mispainted if that is still ambiguous.
+- Two Git repositories that share a name inside one workspace are both colored
+  now; previously the second one discovered was dropped.
+
 ## [2.1.2] - 2026-09-18
 
 ### Fixed

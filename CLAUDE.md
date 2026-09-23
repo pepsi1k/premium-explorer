@@ -85,8 +85,17 @@ with every message and prompt left to [injection.ts](src/injection.ts).
   where a row's text actually ends.
 - **`inherit` reads the ancestor's baked `inner` part.** That is why bake order is
   shallowest-first; `NO_ANCESTOR_FALLBACK` covers a top-level folder.
-- **Folders are matched by *name*, not path, in the browser.** The DOM has no
-  paths. Two same-named folders in one workspace therefore share a color.
+- **Folders are matched by *path*, which the browser has to reconstruct.** The DOM
+  carries no paths, so `groupByWorkspace()` keys each baked folder by `folderKey()`
+  — its path relative to the owning workspace folder, lowercased and `/`-separated
+  — and `folderAt()` in [inject.js](media/inject.js) rebuilds a row's path from the
+  `aria-level` chain the walk already keeps (`segs`/`segsFrom`). Level 1 is the
+  workspace folders themselves in a multi-root window and already *inside* the
+  folder in a single-folder one, which is what `multiRoot` decides. When the list is
+  scrolled so the outer ancestors aren't rendered, only the tail of the path is
+  known; a row is then matched on that tail plus its depth, and left unpainted if
+  that is ambiguous. In practice the tree's sticky-scroll rows carry `aria-level`
+  and sort to the front by `style.top`, so the full chain is usually there anyway.
 - **One global file, per-workspace colors *and* selection.** The injected file is
   shared by every window, so `globalState` holds two unions keyed by lowercased
   workspace-folder name — `premiumExplorer.workspaceColors` and
