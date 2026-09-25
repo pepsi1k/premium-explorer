@@ -3,6 +3,25 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.5] - 2026-09-25
+
+### Fixed
+- **Re-applying background painting after a VS Code update failed with
+  `EACCES: permission denied` even though access had already been granted.** A
+  `.deb`/`.rpm` update keeps the workbench directory the user took ownership of but
+  replaces `workbench.html` inside it with a fresh root-owned copy, so the access
+  check passed and the write then failed. Patched files are now replaced by an
+  atomic rename, which needs only the directory access the user already gave.
+- **Disabling painting after such an update could restore the previous VS Code's
+  `workbench.html`.** The backup was kept from before the update; it is now
+  refreshed whenever the workbench is found unpatched.
+
+### Changed
+- **Details** on a permission error now opens a dialog inside VS Code with the
+  directory that needs access and the exact command to grant it (with **Copy
+  Command**), instead of a notification that closed on click and linked out to the
+  README. The command is shown, never run.
+
 ## [2.1.4] - 2026-09-23
 
 ### Fixed

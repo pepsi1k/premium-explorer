@@ -36,9 +36,10 @@ const JS_FILE = 'premium-explorer.js';
 
 /**
  * Pristine `workbench.html`, saved before the first patch so uninstalling restores
- * the file byte-for-byte rather than trusting our own region-stripping regex. A VS
- * Code update replaces the whole directory, taking this with it — which is correct:
- * the new `workbench.html` is its own pristine copy.
+ * the file byte-for-byte rather than trusting our own region-stripping regex. It is
+ * refreshed whenever the file is found unpatched: a `.deb`/`.rpm` update replaces
+ * `workbench.html` but leaves our extra files in place, so a backup from before the
+ * update would otherwise restore the *previous* VS Code's HTML.
  */
 const BACKUP_FILE = 'workbench.premium-explorer-backup.html';
 
@@ -194,9 +195,10 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
   const clean = original.replace(REGION, '');
 
   // Back up the *cleaned* HTML — patching an already-patched file must not record
-  // our own tags as the pristine state to restore later.
+  // our own tags as the pristine state to restore later. An unpatched file is the
+  // pristine state by definition, so it always replaces whatever backup is there.
   const backup = path.join(workbench.dir, BACKUP_FILE);
-  if (!fs.existsSync(backup)) {
+  if (clean === original || !fs.existsSync(backup)) {
     write(backup, clean);
   }
 
@@ -258,19 +260,35 @@ function read(file: string): string {
   }
 }
 
+/**
+ * Files are replaced, never written into. What {@link checkAccess} establishes is
+ * that the *directory* is writable, and that is not the same as its files being
+ * writable: a `.deb`/`.rpm` update keeps the directory the user took ownership of
+ * but lays a fresh root-owned `workbench.html` inside it, so opening that file for
+ * writing fails with EACCES. Renaming over it needs only the directory, which is
+ * exactly the access the user granted — and the swap is atomic as a bonus, so a
+ * failed write can never leave the workbench half-written.
+ */
 function write(file: string, content: string): void {
-  try {
-    fs.writeFileSync(file, content, 'utf8');
-  } catch (e) {
-    throw new PatchError(`Could not write ${path.basename(file)}: ${reason(e)}`, permissionHint());
-  }
+  replace(file, 'write', tmp => fs.writeFileSync(tmp, content, 'utf8'));
 }
 
 function copy(from: string, to: string): void {
+  replace(to, 'copy in', tmp => fs.copyFileSync(from, tmp));
+}
+
+function replace(file: string, verb: string, fill: (tmp: string) => void): void {
+  const tmp = `${file}.premium-explorer-tmp`;
   try {
-    fs.copyFileSync(from, to);
+    fill(tmp);
+    fs.renameSync(tmp, file);
   } catch (e) {
-    throw new PatchError(`Could not copy in ${path.basename(to)}: ${reason(e)}`, permissionHint());
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // Never created, which is the state we wanted.
+    }
+    throw new PatchError(`Could not ${verb} ${path.basename(file)}: ${reason(e)}`, permissionHint());
   }
 }
 

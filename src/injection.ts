@@ -42,7 +42,7 @@ export async function enableInjection(
   try {
     apply(status.workbench, version, { css: files.cssUri.fsPath, js: files.jsUri.fsPath });
   } catch (e) {
-    await reportPatchFailure(e);
+    await reportPatchFailure(e, status.workbench.dir);
     return;
   }
 
@@ -79,7 +79,7 @@ export async function disableInjection(context: vscode.ExtensionContext): Promis
   try {
     remove(status.workbench);
   } catch (e) {
-    await reportPatchFailure(e);
+    await reportPatchFailure(e, status.workbench.dir);
     return;
   }
   await offerReload('Premium Explorer: workbench restored. Reload to apply.');
@@ -130,10 +130,9 @@ const DOCS_URL = 'https://github.com/pepsi1k/premium-explorer#system-owned-insta
  * Report an install we cannot write into, and say what the user has to do about it.
  *
  * Reporting is the whole of our part. Granting write access to a system-owned
- * directory needs privileges this process does not have, so the extension neither
- * runs nor offers to run anything — it names the directory, states the situation,
- * and leaves the change to the user, done deliberately and outside VS Code. The
- * how-to lives in the README, behind **Details**.
+ * directory needs privileges this process does not have, so the extension never
+ * runs anything — it names the directory, states the situation, and behind
+ * **Details** shows the command for the user to run themselves, outside VS Code.
  *
  * `lost` marks the call that follows a VS Code update, which is the one place the
  * user needs telling that this recurs: the update replaced the whole directory and
@@ -154,7 +153,7 @@ async function reportNoAccess(
       'Details',
     );
     if (choice === 'Details') {
-      await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+      await showFix(dir, 'readonly');
     }
     return;
   }
@@ -170,7 +169,7 @@ async function reportNoAccess(
     'Details',
   );
   if (choice === 'Details') {
-    await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+    await showFix(dir, 'permission');
   }
 }
 
@@ -180,7 +179,7 @@ async function reportNoAccess(
  * file, a layout we don't recognise, a directory that turned unwritable between
  * the check and the write. Each {@link PatchError} carries its own hint.
  */
-async function reportPatchFailure(e: unknown): Promise<void> {
+async function reportPatchFailure(e: unknown, dir: string): Promise<void> {
   if (!(e instanceof PatchError)) {
     vscode.window.showErrorMessage(`Premium Explorer: ${(e as Error).message}`);
     return;
@@ -190,6 +189,54 @@ async function reportPatchFailure(e: unknown): Promise<void> {
     'Details',
   );
   if (choice === 'Details') {
+    await showFix(dir, 'permission');
+  }
+}
+
+/**
+ * What **Details** opens: the fix itself, in a modal that stays up until dismissed.
+ * A notification closes the moment one of its buttons is clicked, so linking out
+ * from it left nothing on screen to act on.
+ *
+ * The command is shown and can be copied, never run — granting access to a
+ * system-owned directory is the user's to do, in their own terminal.
+ */
+async function showFix(dir: string, reason: 'permission' | 'readonly'): Promise<void> {
+  const rerun = 'then run "Premium Explorer: Enable Background Painting" again.';
+  let detail: string;
+  let command: string | undefined;
+  if (reason === 'readonly') {
+    detail =
+      'Snap and Flatpak mount VS Code from a read-only image, so no permission exists ' +
+      'to grant. Background painting needs the .deb/.rpm package or the tarball build; ' +
+      'after switching, ' + rerun;
+  } else if (process.platform === 'win32') {
+    detail =
+      `Premium Explorer needs write access to:\n${dir}\n\n` +
+      'Permanent fix: reinstall VS Code with the User Installer, which puts it under ' +
+      '%LOCALAPPDATA% where your account already has access. One-off: start VS Code ' +
+      'with "Run as administrator" once, and ' + rerun;
+  } else {
+    command = `sudo chown -R "$USER" "${dir}"`;
+    detail =
+      `Premium Explorer needs write access to:\n${dir}\n\n` +
+      `Run this in a terminal:\n\n${command}\n\n` +
+      `…${rerun}\n\n` +
+      'Each VS Code update resets the ownership and removes the patch, so expect to ' +
+      'repeat this after updating.';
+  }
+  const actions = command ? ['Copy Command', 'Open Docs'] : ['Open Docs'];
+  const choice = await vscode.window.showInformationMessage(
+    'How to enable background painting',
+    { modal: true, detail },
+    ...actions,
+  );
+  if (choice === 'Copy Command' && command) {
+    await vscode.env.clipboard.writeText(command);
+    vscode.window.showInformationMessage(
+      `Premium Explorer: command copied. Run it in a terminal, ${rerun}`,
+    );
+  } else if (choice === 'Open Docs') {
     await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
   }
 }
