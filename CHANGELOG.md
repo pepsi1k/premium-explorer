@@ -3,6 +3,17 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.6] - 2026-09-25
+
+### Changed
+- **Plainer permission messages.** When background painting cannot write to the
+  VS Code folder, the notification now says so in one or two plain sentences and
+  says what to do — give your user account write access to the folder, then run
+  **Enable Background Painting** again — without error codes or long paths.
+- **Details** now shows a short explanation with the folder path and an example
+  command to read. The **Copy Command** button from 2.1.5 is gone: the extension
+  never runs or copies commands, and granting access stays your decision.
+
 ## [2.1.5] - 2026-09-25
 
 ### Fixed

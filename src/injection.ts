@@ -132,7 +132,7 @@ const DOCS_URL = 'https://github.com/pepsi1k/premium-explorer#system-owned-insta
  * Reporting is the whole of our part. Granting write access to a system-owned
  * directory needs privileges this process does not have, so the extension never
  * runs anything — it names the directory, states the situation, and behind
- * **Details** shows the command for the user to run themselves, outside VS Code.
+ * **Details** explains what the user can do about it, with an example to run themselves.
  *
  * `lost` marks the call that follows a VS Code update, which is the one place the
  * user needs telling that this recurs: the update replaced the whole directory and
@@ -147,9 +147,8 @@ async function reportNoAccess(
     // Snap and Flatpak mount the app from a read-only image, so there is no
     // permission to grant — the only fix is a different package.
     const choice = await vscode.window.showErrorMessage(
-      'Premium Explorer: this VS Code is installed on a read-only image (Snap or Flatpak), ' +
-      'so its workbench cannot be patched at all. Folder badges and label colors still ' +
-      'work; background painting needs the .deb/.rpm or tarball build.',
+      'Premium Explorer: background painting does not work with the Snap or Flatpak ' +
+      'version of VS Code. Install the .deb, .rpm or tarball version to use it.',
       'Details',
     );
     if (choice === 'Details') {
@@ -159,15 +158,9 @@ async function reportNoAccess(
   }
 
   const lead = lost
-    ? 'Premium Explorer: the VS Code update removed its background painting and restored ' +
-      'the installation to system ownership, so it cannot be put back yet.'
-    : 'Premium Explorer: background painting needs write access to this VS Code ' +
-      'installation, and does not have it. Nothing has been changed.';
-  const choice = await vscode.window.showWarningMessage(
-    `${lead} ${permissionHint()} Give your user account write access to ${dir}, ` +
-    'then run the command again.',
-    'Details',
-  );
+    ? 'Premium Explorer: the VS Code update turned off background painting.'
+    : 'Premium Explorer: background painting cannot write to the VS Code folder.';
+  const choice = await vscode.window.showWarningMessage(`${lead} ${permissionHint()}`, 'Details');
   if (choice === 'Details') {
     await showFix(dir, 'permission');
   }
@@ -194,49 +187,35 @@ async function reportPatchFailure(e: unknown, dir: string): Promise<void> {
 }
 
 /**
- * What **Details** opens: the fix itself, in a modal that stays up until dismissed.
- * A notification closes the moment one of its buttons is clicked, so linking out
- * from it left nothing on screen to act on.
+ * What **Details** opens: a short explanation, in a modal that stays up until
+ * dismissed. A notification closes the moment one of its buttons is clicked, so
+ * linking out from it left nothing on screen to act on.
  *
- * The command is shown and can be copied, never run — granting access to a
- * system-owned directory is the user's to do, in their own terminal.
+ * The example command is text to read, never copied or run — see
+ * .claude/rules/no-shell-commands.md.
  */
 async function showFix(dir: string, reason: 'permission' | 'readonly'): Promise<void> {
   const rerun = 'then run "Premium Explorer: Enable Background Painting" again.';
   let detail: string;
-  let command: string | undefined;
   if (reason === 'readonly') {
     detail =
-      'Snap and Flatpak mount VS Code from a read-only image, so no permission exists ' +
-      'to grant. Background painting needs the .deb/.rpm package or the tarball build; ' +
-      'after switching, ' + rerun;
-  } else if (process.platform === 'win32') {
-    detail =
-      `Premium Explorer needs write access to:\n${dir}\n\n` +
-      'Permanent fix: reinstall VS Code with the User Installer, which puts it under ' +
-      '%LOCALAPPDATA% where your account already has access. One-off: start VS Code ' +
-      'with "Run as administrator" once, and ' + rerun;
+      'Snap and Flatpak run VS Code from a read-only image, so this cannot be fixed. ' +
+      'Install the .deb/.rpm or tarball build instead, ' + rerun;
   } else {
-    command = `sudo chown -R "$USER" "${dir}"`;
+    const example = process.platform === 'win32'
+      ? `icacls "${dir}" /grant "%USERNAME%:(OI)(CI)M" /T`
+      : `sudo chown -R "$USER" "${dir}"`;
     detail =
-      `Premium Explorer needs write access to:\n${dir}\n\n` +
-      `Run this in a terminal:\n\n${command}\n\n` +
-      `…${rerun}\n\n` +
-      'Each VS Code update resets the ownership and removes the patch, so expect to ' +
-      'repeat this after updating.';
+      `Your account needs write access to:\n${dir}\n\n` +
+      `If you choose to grant it, for example:\n${example}\n\n` +
+      `…${rerun} A VS Code update resets this.`;
   }
-  const actions = command ? ['Copy Command', 'Open Docs'] : ['Open Docs'];
   const choice = await vscode.window.showInformationMessage(
     'How to enable background painting',
     { modal: true, detail },
-    ...actions,
+    'Open Docs',
   );
-  if (choice === 'Copy Command' && command) {
-    await vscode.env.clipboard.writeText(command);
-    vscode.window.showInformationMessage(
-      `Premium Explorer: command copied. Run it in a terminal, ${rerun}`,
-    );
-  } else if (choice === 'Open Docs') {
+  if (choice === 'Open Docs') {
     await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
   }
 }

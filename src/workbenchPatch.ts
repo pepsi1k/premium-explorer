@@ -256,7 +256,7 @@ function read(file: string): string {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (e) {
-    throw new PatchError(`Could not read ${path.basename(file)}: ${reason(e)}`, permissionHint());
+    throw new PatchError(`Could not read ${path.basename(file)} (${reason(e)}).`, permissionHint());
   }
 }
 
@@ -288,36 +288,30 @@ function replace(file: string, verb: string, fill: (tmp: string) => void): void 
     } catch {
       // Never created, which is the state we wanted.
     }
-    throw new PatchError(`Could not ${verb} ${path.basename(file)}: ${reason(e)}`, permissionHint());
+    throw new PatchError(`Could not ${verb} ${path.basename(file)} (${reason(e)}).`, permissionHint());
   }
 }
 
 /**
- * Node appends the syscall and the full path to every `fs` error message. Both are
- * dead weight in a notification: the path is a hundred characters the user cannot
- * act on, and the hint below already names the one directory that matters. Keep
- * only the part that says what went wrong — `EACCES: permission denied`.
+ * Node's `fs` messages carry an error code, the syscall and the full path — none of
+ * which the user can act on. Say what went wrong in plain words instead.
  */
 function reason(e: unknown): string {
+  const code = (e as NodeJS.ErrnoException).code;
+  if (code === 'EACCES' || code === 'EPERM') {
+    return 'permission denied';
+  }
+  if (code === 'EROFS') {
+    return 'the VS Code folder is read-only';
+  }
   return (e as Error).message.replace(/,\s+\w+\s+'.*'$/, '');
 }
 
 /**
- * Why this install is not writable, in one line.
- *
- * Says what is true, never what to type. Granting write access to a system-owned
- * directory needs privileges this process does not have and must not ask for — it
- * is the user's to do, deliberately, outside VS Code. So the extension describes
- * the situation and stops there; the README carries the how-to.
+ * What to do about a VS Code folder we cannot write to, in one plain sentence.
+ * The how — an example command — is shown only behind **Details**.
  */
 export function permissionHint(): string {
-  if (process.platform === 'win32') {
-    return 'This VS Code was installed for all users, so its files are Administrator-owned. ' +
-      'Reinstalling with the User Installer puts VS Code somewhere your account already owns.';
-  }
-  if (process.platform === 'darwin') {
-    return 'This VS Code is owned by the system. Patching it also invalidates the app\'s ' +
-      'code signature.';
-  }
-  return 'This VS Code was installed system-wide, so its files are root-owned.';
+  return 'To fix it, give your user account write access to the VS Code folder, then ' +
+    'run "Premium Explorer: Enable Background Painting" again.';
 }
