@@ -3,6 +3,7 @@
 - [x] update icons with /desing-sync pull, use assets to update icon
 - [x] telegram notifications
 - [] disable link coloring by default. Severals
+- [] gradient coloring
 
 
 
