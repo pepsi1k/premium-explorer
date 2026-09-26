@@ -2,8 +2,9 @@
 - [x] with access to gtihub, you have to remove all releases expect 2.0.0
 - [x] update icons with /desing-sync pull, use assets to update icon
 - [x] telegram notifications
-- [] disable link coloring by default. Severals
+- [x] disable link coloring by default. Severals
 
-
+- [] gradient background coloring
+- [] merge background colors, for example if there is
 
 - [] write all requirements
