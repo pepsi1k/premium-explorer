@@ -42,7 +42,7 @@ export async function enableInjection(
   try {
     apply(status.workbench, version, { css: files.cssUri.fsPath, js: files.jsUri.fsPath });
   } catch (e) {
-    await reportPatchFailure(e);
+    await reportPatchFailure(e, status.workbench.dir);
     return;
   }
 
@@ -79,7 +79,7 @@ export async function disableInjection(context: vscode.ExtensionContext): Promis
   try {
     remove(status.workbench);
   } catch (e) {
-    await reportPatchFailure(e);
+    await reportPatchFailure(e, status.workbench.dir);
     return;
   }
   await offerReload('Premium Explorer: workbench restored. Reload to apply.');
@@ -130,10 +130,9 @@ const DOCS_URL = 'https://github.com/pepsi1k/premium-explorer#system-owned-insta
  * Report an install we cannot write into, and say what the user has to do about it.
  *
  * Reporting is the whole of our part. Granting write access to a system-owned
- * directory needs privileges this process does not have, so the extension neither
- * runs nor offers to run anything — it names the directory, states the situation,
- * and leaves the change to the user, done deliberately and outside VS Code. The
- * how-to lives in the README, behind **Details**.
+ * directory needs privileges this process does not have, so the extension never
+ * runs anything — it names the directory, states the situation, and behind
+ * **Details** explains what the user can do about it, with an example to run themselves.
  *
  * `lost` marks the call that follows a VS Code update, which is the one place the
  * user needs telling that this recurs: the update replaced the whole directory and
@@ -148,29 +147,22 @@ async function reportNoAccess(
     // Snap and Flatpak mount the app from a read-only image, so there is no
     // permission to grant — the only fix is a different package.
     const choice = await vscode.window.showErrorMessage(
-      'Premium Explorer: this VS Code is installed on a read-only image (Snap or Flatpak), ' +
-      'so its workbench cannot be patched at all. Folder badges and label colors still ' +
-      'work; background painting needs the .deb/.rpm or tarball build.',
+      'Premium Explorer: background painting does not work with the Snap or Flatpak ' +
+      'version of VS Code. Install the .deb, .rpm or tarball version to use it.',
       'Details',
     );
     if (choice === 'Details') {
-      await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+      await showFix(dir, 'readonly');
     }
     return;
   }
 
   const lead = lost
-    ? 'Premium Explorer: the VS Code update removed its background painting and restored ' +
-      'the installation to system ownership, so it cannot be put back yet.'
-    : 'Premium Explorer: background painting needs write access to this VS Code ' +
-      'installation, and does not have it. Nothing has been changed.';
-  const choice = await vscode.window.showWarningMessage(
-    `${lead} ${permissionHint()} Give your user account write access to ${dir}, ` +
-    'then run the command again.',
-    'Details',
-  );
+    ? 'Premium Explorer: the VS Code update turned off background painting.'
+    : 'Premium Explorer: background painting cannot write to the VS Code folder.';
+  const choice = await vscode.window.showWarningMessage(`${lead} ${permissionHint()}`, 'Details');
   if (choice === 'Details') {
-    await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
+    await showFix(dir, 'permission');
   }
 }
 
@@ -180,7 +172,7 @@ async function reportNoAccess(
  * file, a layout we don't recognise, a directory that turned unwritable between
  * the check and the write. Each {@link PatchError} carries its own hint.
  */
-async function reportPatchFailure(e: unknown): Promise<void> {
+async function reportPatchFailure(e: unknown, dir: string): Promise<void> {
   if (!(e instanceof PatchError)) {
     vscode.window.showErrorMessage(`Premium Explorer: ${(e as Error).message}`);
     return;
@@ -190,6 +182,40 @@ async function reportPatchFailure(e: unknown): Promise<void> {
     'Details',
   );
   if (choice === 'Details') {
+    await showFix(dir, 'permission');
+  }
+}
+
+/**
+ * What **Details** opens: a short explanation, in a modal that stays up until
+ * dismissed. A notification closes the moment one of its buttons is clicked, so
+ * linking out from it left nothing on screen to act on.
+ *
+ * The example command is text to read, never copied or run — see
+ * .claude/rules/no-shell-commands.md.
+ */
+async function showFix(dir: string, reason: 'permission' | 'readonly'): Promise<void> {
+  const rerun = 'then run "Premium Explorer: Enable Background Painting" again.';
+  let detail: string;
+  if (reason === 'readonly') {
+    detail =
+      'Snap and Flatpak run VS Code from a read-only image, so this cannot be fixed. ' +
+      'Install the .deb/.rpm or tarball build instead, ' + rerun;
+  } else {
+    const example = process.platform === 'win32'
+      ? `icacls "${dir}" /grant "%USERNAME%:(OI)(CI)M" /T`
+      : `sudo chown -R "$USER" "${dir}"`;
+    detail =
+      `Your account needs write access to:\n${dir}\n\n` +
+      `If you choose to grant it, for example:\n${example}\n\n` +
+      `…${rerun} A VS Code update resets this.`;
+  }
+  const choice = await vscode.window.showInformationMessage(
+    'How to enable background painting',
+    { modal: true, detail },
+    'Open Docs',
+  );
+  if (choice === 'Open Docs') {
     await vscode.env.openExternal(vscode.Uri.parse(DOCS_URL));
   }
 }

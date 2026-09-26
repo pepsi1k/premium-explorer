@@ -36,9 +36,10 @@ const JS_FILE = 'premium-explorer.js';
 
 /**
  * Pristine `workbench.html`, saved before the first patch so uninstalling restores
- * the file byte-for-byte rather than trusting our own region-stripping regex. A VS
- * Code update replaces the whole directory, taking this with it — which is correct:
- * the new `workbench.html` is its own pristine copy.
+ * the file byte-for-byte rather than trusting our own region-stripping regex. It is
+ * refreshed whenever the file is found unpatched: a `.deb`/`.rpm` update replaces
+ * `workbench.html` but leaves our extra files in place, so a backup from before the
+ * update would otherwise restore the *previous* VS Code's HTML.
  */
 const BACKUP_FILE = 'workbench.premium-explorer-backup.html';
 
@@ -194,9 +195,10 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
   const clean = original.replace(REGION, '');
 
   // Back up the *cleaned* HTML — patching an already-patched file must not record
-  // our own tags as the pristine state to restore later.
+  // our own tags as the pristine state to restore later. An unpatched file is the
+  // pristine state by definition, so it always replaces whatever backup is there.
   const backup = path.join(workbench.dir, BACKUP_FILE);
-  if (!fs.existsSync(backup)) {
+  if (clean === original || !fs.existsSync(backup)) {
     write(backup, clean);
   }
 
@@ -254,52 +256,62 @@ function read(file: string): string {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (e) {
-    throw new PatchError(`Could not read ${path.basename(file)}: ${reason(e)}`, permissionHint());
-  }
-}
-
-function write(file: string, content: string): void {
-  try {
-    fs.writeFileSync(file, content, 'utf8');
-  } catch (e) {
-    throw new PatchError(`Could not write ${path.basename(file)}: ${reason(e)}`, permissionHint());
-  }
-}
-
-function copy(from: string, to: string): void {
-  try {
-    fs.copyFileSync(from, to);
-  } catch (e) {
-    throw new PatchError(`Could not copy in ${path.basename(to)}: ${reason(e)}`, permissionHint());
+    throw new PatchError(`Could not read ${path.basename(file)} (${reason(e)}).`, permissionHint());
   }
 }
 
 /**
- * Node appends the syscall and the full path to every `fs` error message. Both are
- * dead weight in a notification: the path is a hundred characters the user cannot
- * act on, and the hint below already names the one directory that matters. Keep
- * only the part that says what went wrong — `EACCES: permission denied`.
+ * Files are replaced, never written into. What {@link checkAccess} establishes is
+ * that the *directory* is writable, and that is not the same as its files being
+ * writable: a `.deb`/`.rpm` update keeps the directory the user took ownership of
+ * but lays a fresh root-owned `workbench.html` inside it, so opening that file for
+ * writing fails with EACCES. Renaming over it needs only the directory, which is
+ * exactly the access the user granted — and the swap is atomic as a bonus, so a
+ * failed write can never leave the workbench half-written.
+ */
+function write(file: string, content: string): void {
+  replace(file, 'write', tmp => fs.writeFileSync(tmp, content, 'utf8'));
+}
+
+function copy(from: string, to: string): void {
+  replace(to, 'copy in', tmp => fs.copyFileSync(from, tmp));
+}
+
+function replace(file: string, verb: string, fill: (tmp: string) => void): void {
+  const tmp = `${file}.premium-explorer-tmp`;
+  try {
+    fill(tmp);
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // Never created, which is the state we wanted.
+    }
+    throw new PatchError(`Could not ${verb} ${path.basename(file)} (${reason(e)}).`, permissionHint());
+  }
+}
+
+/**
+ * Node's `fs` messages carry an error code, the syscall and the full path — none of
+ * which the user can act on. Say what went wrong in plain words instead.
  */
 function reason(e: unknown): string {
+  const code = (e as NodeJS.ErrnoException).code;
+  if (code === 'EACCES' || code === 'EPERM') {
+    return 'permission denied';
+  }
+  if (code === 'EROFS') {
+    return 'the VS Code folder is read-only';
+  }
   return (e as Error).message.replace(/,\s+\w+\s+'.*'$/, '');
 }
 
 /**
- * Why this install is not writable, in one line.
- *
- * Says what is true, never what to type. Granting write access to a system-owned
- * directory needs privileges this process does not have and must not ask for — it
- * is the user's to do, deliberately, outside VS Code. So the extension describes
- * the situation and stops there; the README carries the how-to.
+ * What to do about a VS Code folder we cannot write to, in one plain sentence.
+ * The how — an example command — is shown only behind **Details**.
  */
 export function permissionHint(): string {
-  if (process.platform === 'win32') {
-    return 'This VS Code was installed for all users, so its files are Administrator-owned. ' +
-      'Reinstalling with the User Installer puts VS Code somewhere your account already owns.';
-  }
-  if (process.platform === 'darwin') {
-    return 'This VS Code is owned by the system. Patching it also invalidates the app\'s ' +
-      'code signature.';
-  }
-  return 'This VS Code was installed system-wide, so its files are root-owned.';
+  return 'To fix it, give your user account write access to the VS Code folder, then ' +
+    'run "Premium Explorer: Enable Background Painting" again.';
 }
