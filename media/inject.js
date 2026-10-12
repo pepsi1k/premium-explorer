@@ -801,21 +801,52 @@
 	}
 
 	var scheduled = false;
+	var lastPaint = 0;
+	// At most one paint every 80ms. A paste can produce dozens of style/class
+	// mutations within a single frame (and more as Monaco keeps reacting over
+	// the next several frames); without this, each one schedules its own
+	// animation-frame repaint back to back for as long as the burst runs.
+	var THROTTLE_MS = 80;
 	function schedule(root) {
 		if (scheduled) { return; }
 		scheduled = true;
-		requestAnimationFrame(function () { scheduled = false; paint(root); });
+		var wait = Math.max(0, THROTTLE_MS - (Date.now() - lastPaint));
+		setTimeout(function () {
+			requestAnimationFrame(function () {
+				scheduled = false;
+				lastPaint = Date.now();
+				paint(root);
+			});
+		}, wait);
 	}
 
-	function start() {
-		var root = document.querySelector(".explorer-folders-view") || document.querySelector(".monaco-workbench");
-		if (!root) { setTimeout(start, 500); return; }
+	// The element a tree-change observer is currently attached to, so a
+	// redundant attach() for the same root is a no-op.
+	var attachedRoot = null;
 
-		// Repaint when the tree changes (scrolling recycles rows, expands, decorations).
+	function attach(root) {
+		if (attachedRoot === root) { return; }
+		attachedRoot = root;
+
+		// Repaint when the tree changes (scrolling recycles rows, expands,
+		// decorations). Scoped to the Explorer's own root — never the whole
+		// workbench, which would turn every unrelated list's churn, and the
+		// editor's, into a full repaint (see waitForExplorer).
 		new MutationObserver(function () { schedule(root); }).observe(root, {
 			subtree: true, childList: true, attributes: true,
 			attributeFilter: ["style", "class", "aria-label", "aria-level", "aria-expanded"]
 		});
+
+		// The Explorer view can be torn down and rebuilt — its pane collapsed
+		// and reopened, or another sidebar view swapped in and back. Watch for
+		// that and re-attach to whatever replaces it, instead of going stale
+		// and never painting again.
+		new MutationObserver(function (_mutations, observer) {
+			if (document.body.contains(root)) { return; }
+			observer.disconnect();
+			attachedRoot = null;
+			waitForExplorer();
+		}).observe(document.body, { subtree: true, childList: true });
 
 		// Track the hovered row so we can paint a lighter shade of its repo color.
 		root.addEventListener("mouseover", function (e) {
@@ -832,6 +863,23 @@
 
 		schedule(root);
 	}
+
+	// Wait for the Explorer to exist instead of falling back to the whole
+	// workbench: a window that opens with another sidebar view visible (or
+	// the sidebar hidden) would otherwise never switch back, and every
+	// keystroke anywhere — not just in the Explorer — would trigger a full
+	// `.monaco-list-row` scan and layout read across the entire workbench.
+	function waitForExplorer() {
+		var root = document.querySelector(".explorer-folders-view");
+		if (root) { attach(root); return; }
+		var waiter = new MutationObserver(function () {
+			var found = document.querySelector(".explorer-folders-view");
+			if (found) { waiter.disconnect(); attach(found); }
+		});
+		waiter.observe(document.body, { subtree: true, childList: true });
+	}
+
+	function start() { waitForExplorer(); }
 
 	if (document.readyState === "complete") { start(); }
 	else { window.addEventListener("load", start); }

@@ -3,6 +3,22 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.7] - 2026-10-12
+
+### Fixed
+- **Pasting could freeze the whole window.** When a window opened without the
+  Explorer rendered (sidebar hidden, or another view like Search open), the
+  painter fell back to watching the entire workbench, so every editor change —
+  a paste above all — triggered a full row scan and layout read, over and over,
+  until VS Code flagged the window as unresponsive. The painter now waits for
+  the Explorer instead of falling back, re-attaches if the Explorer view is
+  torn down and rebuilt, and never watches anything outside it. If the Explorer
+  never appears, nothing is painted and nothing is slowed down.
+
+### Changed
+- Repaints are coalesced to at most one every 80 ms instead of one per
+  animation frame, so bursts of changes settle out instead of piling up.
+
 ## [2.1.6] - 2026-09-25
 
 ### Changed
