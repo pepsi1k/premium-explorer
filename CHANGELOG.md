@@ -3,6 +3,27 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.8] - 2026-10-13
+
+### Fixed
+- **Hovering lagged, and could briefly freeze, in workspaces with watermark
+  glyphs.** Every row the mouse crossed repainted the entire Explorer, and each
+  of those repaints compared the full watermark artwork (tens of KB per row) by
+  text just to find nothing had changed. Hover is now applied by plain CSS —
+  the painter publishes the brighter colors up front and the browser swaps them
+  under the cursor — so moving the mouse costs no script at all, and change
+  tracking identifies watermarks without ever touching the artwork text.
+- **"Premium Explorer: Refresh" now actually applies settings changes.** The
+  command only refreshed folder badges and never regenerated the injected
+  styles, so edits to `premiumExplorer.*` rules (like turning an inner
+  background off) appeared to do nothing. It now regenerates and offers the
+  window reload that applies them. (The command was renamed from "Refresh
+  Decorations" to "Refresh" to match.)
+
+### Changed
+- The striped edge bar no longer brightens on hover. It keeps its resting
+  colors — the row fill and label pill still brighten, now via CSS.
+
 ## [2.1.7] - 2026-10-12
 
 ### Fixed

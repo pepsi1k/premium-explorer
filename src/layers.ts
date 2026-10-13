@@ -35,10 +35,14 @@ export interface Layer {
   hover: string;
 }
 
-/** The baked left bar: a CSS gradient confined to a `width`px strip (empty = off). */
+/**
+ * The baked left bar: a CSS gradient confined to a `width`px strip (empty = off).
+ * No hover variant: the bar keeps its resting colours under the cursor — a 3px
+ * stripe brightening was never legible, and dropping it is what lets hover be
+ * pure CSS (the fill and pill brighten via custom properties instead).
+ */
 export interface StripeLayer {
   image: string;
-  hover: string;
   width: number;
 }
 
@@ -138,13 +142,11 @@ export function buildStripe(p: PartConfig, sequence: string[], inherited: Stripe
     effective = NO_ANCESTOR_FALLBACK.edge;
   }
   if (effective !== 'solid') {
-    return { image: '', hover: '', width: 0 };
+    return { image: '', width: 0 };
   }
   const colors = p.edgeColors.length ? p.edgeColors : (p.edgeColor ? [p.edgeColor] : sequence);
-  const hoverAlpha = Math.min(1, p.edgeOpacity + HOVER_OPACITY_BOOST);
   return {
     image: stripeGradient(colors.map(c => hexToRgba(c, p.edgeOpacity)), p.edgeStripeSize),
-    hover: stripeGradient(colors.map(c => hexToRgba(lightenHex(c, HOVER_LIGHTEN), hoverAlpha)), p.edgeStripeSize),
     width: Math.max(1, Math.round(p.edgeWidth)),
   };
 }

@@ -620,7 +620,21 @@ function buildCss(): string {
     `${row}${marker} .monaco-tl-twistie`,
   ].join(',\n');
 
-  return header + editCss +
+  // Hover brightening. The painter used to repaint the whole pane on every
+  // mouseover just to swap each layer's hover variant in — with watermark
+  // data-URIs in play that made moving the mouse drag megabytes of string work
+  // per paint. Instead the script publishes the brighter colors up front as
+  // custom properties on exactly the rows whose fill/pill is their own (never a
+  // selection or rename fill — see setHoverVars in inject.js), and the
+  // browser's own `:hover` does the swap with no script at all. `!important`
+  // because the resting color is an inline style.
+  const hoverRow = 'body.fc-active .explorer-folders-view .monaco-list-row';
+  const hoverCss =
+    '\n/* Hover brightening: applied by CSS so mouse moves never repaint. */\n' +
+    `${hoverRow}.fc-hover-bg:hover {\n\tbackground-color: var(--fc-bg-hover) !important;\n}\n` +
+    `${hoverRow}.fc-hover-pill:hover .label-name {\n\tbackground-color: var(--fc-pill-hover) !important;\n}\n`;
+
+  return header + editCss + hoverCss +
     '\n/* Selected-row label + twistie. */\n' +
     selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
     selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n';

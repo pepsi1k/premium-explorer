@@ -32,7 +32,6 @@
 	// no colour to use there. `paint()` picks this window's before it paints a row.
 	var SELECTIONS = config.selections || {};
 	var SEL = config.selection;          // { bg, text, opacity, border, inactiveDarken, overrides, bold }
-	var hovered = null;                  // the row element currently under the cursor
 
 	// How far a row being renamed shifts off the color it would otherwise paint —
 	// enough to register as a change, not enough to look like a different folder.
@@ -312,27 +311,59 @@
 		row.classList.toggle("fc-sel-bold", !!bold);
 	}
 
+	// The hover colors, published as custom properties for the generated CSS's
+	// `:hover` rules. Hover used to be painted from here — every mouseover swept a
+	// full repaint across the pane, and with watermark data-URIs in the image keys
+	// that dragged megabytes of string work per mouse move (EM-85). The browser's
+	// own `:hover` swaps a custom property for free, so the painter only has to say
+	// what the brighter color *is*; the classes keep the rules off rows we never
+	// painted, exactly like `.fc-sel-text`.
+	function setHoverVars(row, bg, pill) {
+		var key = bg + "|" + pill;
+		if ((row.dataset.fcHover || "") === key) { return; }
+		row.dataset.fcHover = key;
+		row.classList.toggle("fc-hover-bg", !!bg);
+		row.classList.toggle("fc-hover-pill", !!pill);
+		if (bg) { row.style.setProperty("--fc-bg-hover", bg); }
+		else { row.style.removeProperty("--fc-bg-hover"); }
+		if (pill) { row.style.setProperty("--fc-pill-hover", pill); }
+		else { row.style.removeProperty("--fc-pill-hover"); }
+	}
+
+	// A short identity for one baked watermark + tint, so change tracking never has
+	// to touch the ~20-48KB URI text. The id is handed out lazily and lives on the
+	// layer object itself, like the tint cache in tintedWatermark.
+	var nextWatermarkId = 0;
+	function watermarkKey(watermark, tint) {
+		if (!watermark.id) { watermark.id = ++nextWatermarkId; }
+		return "w" + watermark.id + ":" + (tint || "");
+	}
+
 	// The stacked background images — edge bar, text cover, watermark — as one
 	// set of comma-separated CSS lists. The FIRST entry paints on top, which is why
 	// the stack is pushed in that order: the bar over the cover, the cover over the
 	// watermark it dims, all of them over the row's background color.
 	function setBgImage(row, layers) {
-		var image = [], size = [], position = [], repeat = [];
+		var size = [], position = [], repeat = [], key = [];
 		for (var i = 0; i < layers.length; i++) {
-			image.push(layers[i].image);
 			size.push(layers[i].size);
 			position.push(layers[i].position);
 			repeat.push(layers[i].repeat);
+			// A layer carrying a `key` (the watermark) is identified by it; the others'
+			// images are short gradient strings and identify themselves.
+			key.push(layers[i].key || layers[i].image);
 		}
-		image = image.join(", "); size = size.join(", ");
-		position = position.join(", "); repeat = repeat.join(", ");
+		size = size.join(", "); position = position.join(", "); repeat = repeat.join(", ");
 		// The position carries the row's phase into the canvas, so it changes as rows
 		// recycle even when the image does not — it has to be part of the key.
-		var key = image + "|" + size + "|" + position + "|" + repeat;
+		key = key.join("|") + "|" + size + "|" + position + "|" + repeat;
 		if ((row.dataset.fcImg || "") === key) { return; }
 		row.dataset.fcImg = key;
+		// Only now, on a real change, pay for joining the full URIs.
+		var image = [];
+		for (var j = 0; j < layers.length; j++) { image.push(layers[j].image); }
 		var s = row.style;
-		s.backgroundImage = image;
+		s.backgroundImage = image.join(", ");
 		s.backgroundSize = size;
 		s.backgroundPosition = position;
 		s.backgroundRepeat = repeat;
@@ -692,22 +723,26 @@
 			var labelOutline = "";  // traced pill edge, only while selected
 
 			// Composite every layer that's on. Each is independent: fill, striped edge,
-			// tiled watermark and pill can all appear at once. Hover brightens them.
+			// tiled watermark and pill can all appear at once. Hover brightening is NOT
+			// painted here: it travels as `--fc-bg-hover`/`--fc-pill-hover` custom
+			// properties (see setHoverVars) and the generated CSS's `:hover` rules do
+			// the swap — so a mouse move never costs a repaint (EM-85).
 			if (part) {
-				var hover = row === hovered;
-				// What the row is filled with at this moment — its own fill, brightened on
-				// hover, or the selection when that takes the background over. The cover
-				// below has to paint this exact color to stay invisible against it.
-				if (part.background.value) { background = hover && part.background.hover ? part.background.hover : part.background.value; }
+				// What the row is filled with at this moment — its own fill, or the
+				// selection when that takes the background over. The cover below has to
+				// paint this exact color to stay invisible against it.
+				if (part.background.value) { background = part.background.value; }
 				if (taken("background")) { background = selFill; }
 				if (part.edge.image) {
 					layers.push({
-						// The bar always keeps its own colours, selected and renaming included.
-						// It is the narrowest mark on the row and the one thing that says which
-						// folder the row belongs to; repainting it in the selection colour spent
-						// it on saying "selected", which the fill over the rest of the row
-						// already says.
-						image: hover && part.edge.hover ? part.edge.hover : part.edge.image,
+						// The bar always keeps its own colours — selected, renaming and
+						// hovered included. It is the narrowest mark on the row and the one
+						// thing that says which folder the row belongs to; repainting it in
+						// the selection colour spent it on saying "selected", which the fill
+						// over the rest of the row already says, and a 3px stripe
+						// brightening on hover was never legible enough to buy back the
+						// whole-pane repaint it used to require.
+						image: part.edge.image,
 						size: part.edge.width + "px 100%",
 						repeat: "no-repeat",
 						position: "left top"
@@ -721,17 +756,19 @@
 							flatten(background || backdrop, backdrop), part.watermark.textDim)
 						: null;
 					if (discs) { layers.push(discs); }
+					var wmTint = taken("watermarks") ? selWatermark : autoWatermark;
 					layers.push({
-						image: tintedWatermark(part.watermark, taken("watermarks") ? selWatermark : autoWatermark),
+						image: tintedWatermark(part.watermark, wmTint),
+						// The URI runs to tens of KB; identity + tint pins it down just as
+						// exactly, so setBgImage never has to compare the URI text itself.
+						key: watermarkKey(part.watermark, wmTint),
 						size: part.watermark.size + "px " + part.watermark.size + "px",
 						repeat: "repeat",
 						position: "left " + (-Math.round(phase * 100) / 100) + "px"
 					});
 				}
 				if (part.pill.value) {
-					labelBg = taken("pills")
-						? selFill
-						: (hover && part.pill.hover ? part.pill.hover : part.pill.value);
+					labelBg = taken("pills") ? selFill : part.pill.value;
 					labelRadius = part.pillRadius;
 					// A pill the selection didn't take over keeps its own fill, so trace its
 					// edge: an `invert` highlight paints the row in the same color as the
@@ -789,8 +826,17 @@
 			var editFill = editing && active ? lift(rowShows, part ? part.solid : "", EDIT_SHIFT) : "";
 			if (editFill) { background = editFill; }
 
+			// Hover brightening, published for the generated CSS's `:hover` rules —
+			// only where the fill/pill showing is the part's own. A selection or
+			// rename fill never brightened under the cursor, and must not start to.
+			var bgHover = part && part.background.hover && background === part.background.value
+				? part.background.hover : "";
+			var pillHover = part && part.pill.hover && labelBg === part.pill.value
+				? part.pill.hover : "";
+
 			setSelLabel(row, selLabel, !!selFill && !!SEL.bold);
 			setEditVars(row, editFill);
+			setHoverVars(row, bgHover, pillHover);
 			setBg(row, background);
 			setBgImage(row, layers);
 			setLabelBg(row, labelBg, labelRadius, labelOutline);
@@ -848,14 +894,9 @@
 			waitForExplorer();
 		}).observe(document.body, { subtree: true, childList: true });
 
-		// Track the hovered row so we can paint a lighter shade of its repo color.
-		root.addEventListener("mouseover", function (e) {
-			var row = e.target && e.target.closest ? e.target.closest(".monaco-list-row") : null;
-			if (row !== hovered) { hovered = row; schedule(root); }
-		});
-		root.addEventListener("mouseleave", function () {
-			if (hovered) { hovered = null; schedule(root); }
-		});
+		// Hover needs no listener at all: the painter publishes `--fc-bg-hover`/
+		// `--fc-pill-hover` up front and the generated CSS's `:hover` rules apply
+		// them, so moving the mouse never schedules a repaint (EM-85).
 
 		// Repaint when Explorer focus changes, to switch active/inactive selection.
 		root.addEventListener("focusin", function () { schedule(root); });

@@ -57,7 +57,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   void restoreInjectionIfLost(context, config);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('premium-explorer.refresh', () => reload(false)),
+    // Regenerate too: the painter's config is baked into the generated JS, so a
+    // refresh that skips regeneration can never change what the Explorer paints.
+    vscode.commands.registerCommand('premium-explorer.refresh', () => reload(true)),
     vscode.commands.registerCommand('premium-explorer.enableInjection', () =>
       enableInjection(context, config),
     ),
