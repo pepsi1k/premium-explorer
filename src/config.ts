@@ -238,7 +238,6 @@ export interface FolderColorerConfig {
   symlinkStyle: SymlinkStyle;
   badge?: string;
   palette: string[];
-  defaultColor: string;
   /** How many colours an auto-derived edge sequence uses (1 = a plain solid bar). */
   edgeColorCount: number;
   /**
@@ -359,7 +358,6 @@ export function readConfig(): FolderColorerConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   const get = (key: string): unknown => cfg.get(key);
 
-  const defaultColor = cfg.get<string>('defaultColor', '#808080');
   const badge = cfg.get<string>('badge', '').trim().slice(0, 2);
 
   return {
@@ -368,7 +366,6 @@ export function readConfig(): FolderColorerConfig {
     symlinkStyle: parseSymlinkStyle(cfg.get<string>('symlinkFolders')) ?? 'none',
     badge: badge || undefined,
     palette: resolvePalette(cfg),
-    defaultColor,
     edgeColorCount: cfg.get<number>('edgeColorCount', 3),
     // `backgroundWatermark` is the pre-1.3 name, still read so an existing config
     // keeps its artwork; the new key wins wherever both are set.

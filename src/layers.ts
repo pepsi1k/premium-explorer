@@ -121,6 +121,11 @@ export function buildLayer(
     return { value: '', hover: '' };
   }
   const hex = color ?? baseHex;
+  if (!hex) {
+    // A manual rule has no base color: `solid` with no color named anywhere
+    // paints nothing rather than a stand-in grey.
+    return { value: '', hover: '' };
+  }
   const lighter = lightenHex(hex, HOVER_LIGHTEN);
   return {
     value: hexToRgba(hex, opacity),
@@ -145,6 +150,11 @@ export function buildStripe(p: PartConfig, sequence: string[], inherited: Stripe
     return { image: '', width: 0 };
   }
   const colors = p.edgeColors.length ? p.edgeColors : (p.edgeColor ? [p.edgeColor] : sequence);
+  if (!colors.length) {
+    // A manual rule derives no sequence, so without an explicit
+    // `edgeColors`/`edgeColor` there is nothing to stripe with.
+    return { image: '', width: 0 };
+  }
   return {
     image: stripeGradient(colors.map(c => hexToRgba(c, p.edgeOpacity)), p.edgeStripeSize),
     width: Math.max(1, Math.round(p.edgeWidth)),
@@ -179,6 +189,12 @@ export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt
   const color = p.watermarkColor === WATERMARK_COLOR_ORIGINAL
     ? ''
     : p.watermarkColor ?? fillHex;
+  if (auto && !color) {
+    // An auto tint shades itself off the fill color, and a manual rule without
+    // one has nothing to shade from — the watermark needs an explicit
+    // `watermarkColor` (or `"original"` artwork) there.
+    return { image: '', size: 0, tint: '', auto: false, contrast: 0, textDim: 0, spots: [] };
+  }
   const canvas = Math.max(32, Math.round(p.watermarkCanvas));
   // `radius` is baked into the scatter itself (see watermarkPatternDataUri) — nothing is
   // laid over the row, so nothing can fail to match its colour. `text` cannot be:
@@ -210,9 +226,9 @@ export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Par
   // The color this row is actually filled with: what the watermark shades itself
   // against, and what the `"invert"`/`"shift"` selections reuse. An `inherit`
   // background adopts the enclosing folder's fill wholesale, so its *color* has to
-  // come from there too — falling back to this folder's own base would report grey
-  // (`defaultColor`, for a manual rule) for a row painted in its parent's color,
-  // and every shade derived from it would be grey with it.
+  // come from there too — falling back to this folder's own base would misreport
+  // a row painted in its parent's color (a manual rule has no base at all), and
+  // every shade derived from it would be wrong with it.
   const fillHex = p.backgroundColor
     ?? (p.backgroundStyle === 'inherit' && inheritFrom ? inheritFrom.solid : baseHex);
   return {

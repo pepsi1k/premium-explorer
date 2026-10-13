@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -59,7 +59,7 @@
         "premiumExplorer.rules": {
           "type": "array",
           "default": [],
-          "markdownDescription": "Path-scoped coloring rules, evaluated by path specificity (a deeper rule wins). With no rules, nothing is colored.\n\n- `git`: every Git repository under `path` is colored automatically, each from `premiumExplorer.palette`.\n- `manual` (used when `engine` is omitted): the folder at `path` **and everything inside it** is styled by this rule's layer settings, over a base of `premiumExplorer.defaultColor`.\n\nEach folder is painted with independent layers — **background**, **edge** bar, **pill**, **text** and **watermark** watermark — set globally via `premiumExplorer.root*`/`premiumExplorer.inner*` and overridable per rule with the same `root*`/`inner*` keys (a `*Color` left empty falls back to the folder base).\n\nPaths may be workspace-relative (`.`, `./projects`) or absolute.\n\n```jsonc\n\"premiumExplorer.rules\": [\n  { \"path\": \".\", \"engine\": \"git\" },\n  { \"path\": \"./notes\", \"rootBackgroundColor\": \"#00b8ff\", \"rootPill\": \"solid\",\n    \"rootTextStyle\": \"bold\", \"innerBackgroundStyle\": \"none\" },\n  { \"path\": \"./scratch\" }\n]\n```",
+          "markdownDescription": "Path-scoped coloring rules, evaluated by path specificity (a deeper rule wins). With no rules, nothing is colored.\n\n- `git`: every Git repository under `path` is colored automatically, each from `premiumExplorer.palette`.\n- `manual` (used when `engine` is omitted): the folder at `path` **and everything inside it** is styled by this rule's layer settings. A layer paints only when a `*Color` names one (per rule or globally) — a bare rule paints nothing.\n\nEach folder is painted with independent layers — **background**, **edge** bar, **pill**, **text** and **watermark** watermark — set globally via `premiumExplorer.root*`/`premiumExplorer.inner*` and overridable per rule with the same `root*`/`inner*` keys (a `*Color` left empty falls back to the folder base).\n\nPaths may be workspace-relative (`.`, `./projects`) or absolute.\n\n```jsonc\n\"premiumExplorer.rules\": [\n  { \"path\": \".\", \"engine\": \"git\" },\n  { \"path\": \"./notes\", \"rootBackgroundColor\": \"#00b8ff\", \"rootPill\": \"solid\",\n    \"rootTextStyle\": \"bold\", \"innerBackgroundStyle\": \"none\" },\n  { \"path\": \"./scratch\" }\n]\n```",
           "items": {
             "type": "object",
             "required": [
@@ -111,7 +111,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "rootBackgroundOpacity": {
                 "type": "number",
@@ -146,7 +146,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "rootEdgeOpacity": {
                 "type": "number",
@@ -181,7 +181,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "rootPillOpacity": {
                 "type": "number",
@@ -252,7 +252,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "innerBackgroundOpacity": {
                 "type": "number",
@@ -287,7 +287,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "innerEdgeOpacity": {
                 "type": "number",
@@ -322,7 +322,7 @@
                     ]
                   }
                 ],
-                "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+                "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
               "innerPillOpacity": {
                 "type": "number",
@@ -662,7 +662,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.rootBackgroundOpacity": {
           "type": "number",
@@ -700,7 +700,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the left edge bar for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.rootEdgeOpacity": {
           "type": "number",
@@ -738,7 +738,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.rootPillOpacity": {
           "type": "number",
@@ -914,7 +914,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.innerBackgroundOpacity": {
           "type": "number",
@@ -952,7 +952,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the left edge bar for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.innerEdgeOpacity": {
           "type": "number",
@@ -990,7 +990,7 @@
             }
           ],
           "default": "",
-          "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to `#premiumExplorer.defaultColor#` for a `manual` rule, or the repo's hashed palette color for a `git` rule."
+          "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
         "premiumExplorer.innerPillOpacity": {
           "type": "number",
@@ -1227,16 +1227,6 @@
             ]
           },
           "markdownDescription": "Colors (hex) used to auto-assign a per-repo color by hashing its name/path. Up to 16 entries. Fewer entries = fewer distinct colors."
-        },
-        "premiumExplorer.defaultColor": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "color-hex"
-            }
-          ],
-          "default": "#808080",
-          "markdownDescription": "Base color for `manual` rules — the fallback every layer uses when its own `*Color` is empty. `git` rules ignore it and hash each repo against `#premiumExplorer.palette#` instead."
         },
         "premiumExplorer.selectedBackgroundColor": {
           "anyOf": [

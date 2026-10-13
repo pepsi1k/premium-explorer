@@ -3,6 +3,22 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.1.9] - 2026-10-13
+
+### Changed
+- **A rule with no color paints nothing.** A `manual` rule's layer now paints
+  only when a `*Color` names a color for it (in the rule or globally) — never
+  the gray stand-in it used to invent. A bare `{ "path": "./x" }` rule paints
+  nothing at all; `git` rules keep their hashed palette colors exactly as
+  before. Consequently a manual rule relying on a global `solid` style without
+  naming any color (previously gray, or an auto-derived edge stripe) now stays
+  unpainted until a color is set.
+
+### Removed
+- **`premiumExplorer.defaultColor` is gone.** It existed only as the gray base
+  for manual rules that named no color; with the change above there is nothing
+  left for it to do. A leftover entry in settings is ignored.
+
 ## [2.1.8] - 2026-10-13
 
 ### Fixed

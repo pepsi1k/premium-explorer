@@ -310,9 +310,11 @@ async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot:
     }
   }
 
-  // Manual folders take precedence over a git repo at the same path. Their
-  // base color is `premiumExplorer.defaultColor` — the fallback each layer uses when
-  // its own `*Color` is empty. Set those per layer to color a folder deliberately.
+  // Manual folders take precedence over a git repo at the same path. They have
+  // no base color: a layer paints only when a `*Color` names one (rule-level or
+  // global), so a rule that sets no color for a layer leaves that layer off —
+  // never a stand-in grey. Only the git engine, which derives its base from the
+  // repo's hash, has a color to fall back to.
   for (const rule of config.rules) {
     if (rule.engine !== 'git') {
       if (isSymlink(rule.absPath) && config.symlinkStyle === 'none') {
@@ -320,8 +322,8 @@ async function resolveColoredFolders(config: FolderColorerConfig, extensionRoot:
       }
       const name = path.basename(rule.absPath);
       byPath.set(rule.absPath, {
-        name, hex: config.defaultColor, absPath: rule.absPath,
-        ...identityOf(config, name, rule.absPath, config.defaultColor, extensionRoot, rule.backgroundWatermarkSymbol),
+        name, hex: '', absPath: rule.absPath,
+        ...identityOf(config, name, rule.absPath, '', extensionRoot, rule.backgroundWatermarkSymbol),
         ...symlinkAdjusted(config, rule.absPath, mergedParts(rule, config)),
       });
     }
@@ -383,7 +385,9 @@ function identityOf(
   const basis = config.colorBy === 'path' ? absPath : name;
   const source = watermark || config.backgroundWatermarkSymbol || (Array.from(name)[0] ?? '').toUpperCase();
   return {
-    sequence: paletteSequence(basis, config.palette, config.edgeColorCount, hex),
+    // No base color (a manual rule) -> no auto-derived sequence: the edge then
+    // paints only from an explicit `edgeColors`/`edgeColor`.
+    sequence: hex ? paletteSequence(basis, config.palette, config.edgeColorCount, hex) : [],
     art: resolveWatermarkArt(source, absPath, extensionRoot),
   };
 }

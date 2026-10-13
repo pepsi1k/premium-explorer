@@ -51,7 +51,7 @@ Generate-time pipeline, all triggered from
 [extension.ts](src/extension.ts) on activation, settings change, workspace-folder
 change, or a `**/.git` watcher event:
 
-1. [config.ts](src/config.ts) — `readConfig()` flattens all 74 `premiumExplorer.*`
+1. [config.ts](src/config.ts) — `readConfig()` flattens all 75 `premiumExplorer.*`
    settings into a `FolderColorerConfig`. Rules are resolved to absolute paths and
    **sorted deepest-path-first**, so `deepestRuleFor()` returning the first match
    is what implements "a deeper rule wins".
