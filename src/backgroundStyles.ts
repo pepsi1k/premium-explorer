@@ -20,6 +20,7 @@ import { inspect as inspectWorkbench, mirror as mirrorWorkbench } from './workbe
 
 const CSS_FILE = 'premium-explorer.css';
 const JS_FILE = 'premium-explorer.js';
+const JSON_FILE = 'premium-explorer.json';
 /** Generated pairs we own, including the one shipped under the extension's old name. */
 const OURS = [CSS_FILE, JS_FILE, 'premium-stash.css', 'premium-stash.js'];
 /**
@@ -74,6 +75,7 @@ interface FolderColors {
 interface GeneratedFiles {
   cssUri: vscode.Uri;
   jsUri: vscode.Uri;
+  jsonUri: vscode.Uri;
   count: number;
 }
 
@@ -93,6 +95,9 @@ export async function writeBackgroundFiles(
     return writeFiles(context,
       '/* premium-explorer disabled (premiumExplorer.enabled = false). */\n',
       '// premium-explorer disabled (premiumExplorer.enabled = false).\n',
+      // An inert config, not an empty file: the painter fetches and parses this,
+      // and `workspaces: {}` is its own "paint nothing anywhere" state.
+      JSON.stringify({ workspaces: {}, selections: {} }) + '\n',
       0,
     );
   }
@@ -107,18 +112,19 @@ export async function writeBackgroundFiles(
 
   const selection = buildSelection(config);
   const css = buildCss();
-  const js = await buildInjectedScript(context, {
+  const js = await buildInjectedScript(context);
+  const injected: InjectedConfig = {
     workspaces,
     selections: mergeWorkspaceSelection(context, selection),
     // The fallback for a workspace that is in the colors union but not yet in the
     // selection one — its window last generated before selections were split per
     // workspace. It self-heals the next time that window generates.
     selection,
-  });
+  };
 
   // `count` is what this workspace matched (drives the "no folders" warning).
   const count = Object.values(thisWindow).reduce((n, m) => n + Object.keys(m).length, 0);
-  return writeFiles(context, css, js, count);
+  return writeFiles(context, css, js, JSON.stringify(injected), count);
 }
 
 
@@ -238,13 +244,16 @@ async function writeFiles(
   context: vscode.ExtensionContext,
   css: string,
   js: string,
+  json: string,
   count: number,
 ): Promise<GeneratedFiles> {
   await vscode.workspace.fs.createDirectory(context.globalStorageUri);
   const cssUri = vscode.Uri.joinPath(context.globalStorageUri, CSS_FILE);
   const jsUri = vscode.Uri.joinPath(context.globalStorageUri, JS_FILE);
+  const jsonUri = vscode.Uri.joinPath(context.globalStorageUri, JSON_FILE);
   await vscode.workspace.fs.writeFile(cssUri, Buffer.from(css, 'utf8'));
   await vscode.workspace.fs.writeFile(jsUri, Buffer.from(js, 'utf8'));
+  await vscode.workspace.fs.writeFile(jsonUri, Buffer.from(json, 'utf8'));
   // Stamp which version wrote these, so regenerateIfStale() has a baseline. Doing
   // it here keeps the stamp describing the files actually on disk, whichever
   // caller produced them.
@@ -252,8 +261,8 @@ async function writeFiles(
     GENERATED_VERSION_STATE,
     String(context.extension?.packageJSON?.version ?? ''),
   );
-  mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath);
-  return { cssUri, jsUri, count };
+  mirrorToWorkbench(cssUri.fsPath, jsUri.fsPath, jsonUri.fsPath);
+  return { cssUri, jsUri, jsonUri, count };
 }
 
 /**
@@ -263,13 +272,13 @@ async function writeFiles(
  * has never turned painting on, and a patch that a VS Code update has wiped is
  * worth one prompt on activation — not a warning every time a setting moves.
  */
-function mirrorToWorkbench(css: string, js: string): void {
+function mirrorToWorkbench(css: string, js: string, json: string): void {
   const status = inspectWorkbench();
   if (status.state !== 'patched') {
     return;
   }
   try {
-    mirrorWorkbench(status.workbench, { css, js });
+    mirrorWorkbench(status.workbench, { css, js, json });
   } catch {
     // Surfaced by the activation check and the enable command instead.
   }
@@ -638,10 +647,23 @@ function buildCss(): string {
     `${hoverRow}.fc-hover-bg:hover {\n\tbackground-color: var(--fc-bg-hover) !important;\n}\n` +
     `${hoverRow}.fc-hover-pill:hover .label-name {\n\tbackground-color: var(--fc-pill-hover) !important;\n}\n`;
 
+  // A selected row whose pill kept its own fill keeps its own label text too
+  // (`.fc-pill-own`, set by the painter): the selection text color is picked
+  // against the selection fill, which is not what this label sits on. The pill's
+  // normal color travels as `--fc-pill-fg`; without one the theme's foreground
+  // is the color the unselected label had. Declared after the `.fc-sel-text`
+  // rule and one class more specific, so it wins exactly on the label.
+  const pillOwn = [
+    `${row}.fc-sel-text.fc-pill-own .label-name`,
+    `${row}.fc-sel-text.fc-pill-own .label-name *`,
+  ].join(',\n');
+
   return header + editCss + hoverCss +
     '\n/* Selected-row label + twistie. */\n' +
     selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
-    selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n';
+    selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n' +
+    '\n/* ...except a label on a pill that kept its own fill (see fc-pill-own). */\n' +
+    pillOwn + ' {\n\tcolor: var(--fc-pill-fg, var(--vscode-foreground)) !important;\n}\n';
 }
 
 /** One workspace's selection settings, as the painter reads them. */
@@ -654,7 +676,7 @@ interface SelectionOptions {
 /** Persisted union: workspace-folder name (lowercased) -> that workspace's selection. */
 type WorkspaceSelection = Record<string, SelectionOptions>;
 
-/** Config baked into the injected script as `globalThis.__premiumExplorerConfig`. */
+/** The baked config, written as its own JSON file the painter fetches at boot. */
 interface InjectedConfig {
   /** Workspace-folder name (lowercased) -> {@link folderKey} -> per-state colors. */
   workspaces: Record<string, Record<string, FolderColors>>;
@@ -664,18 +686,17 @@ interface InjectedConfig {
   selection: SelectionOptions;
 }
 
-/** Prepend the baked config to the static browser script (media/inject.js). */
-async function buildInjectedScript(
-  context: vscode.ExtensionContext,
-  injected: InjectedConfig,
-): Promise<string> {
+/**
+ * The static browser script (media/inject.js), shipped verbatim. The baked config
+ * is NOT prepended: the workbench serves the script from Chromium's cache across
+ * window reloads, so anything riding inside it went stale until a full app restart
+ * (EM-86). The config travels as its own JSON file instead, which the script
+ * fetches with `cache: "no-store"` on every boot.
+ */
+async function buildInjectedScript(context: vscode.ExtensionContext): Promise<string> {
   const templateUri = vscode.Uri.joinPath(context.extensionUri, 'media', 'inject.js');
   const template = Buffer.from(await vscode.workspace.fs.readFile(templateUri)).toString('utf8');
-  return (
-    '// Auto-generated by premium-explorer. Do not edit — regenerated from settings.\n' +
-    `globalThis.__premiumExplorerConfig = ${JSON.stringify(injected)};\n\n` +
-    template
-  );
+  return '// Auto-generated by premium-explorer. Do not edit — regenerated from settings.\n' + template;
 }
 
 /**

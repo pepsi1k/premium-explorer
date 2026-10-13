@@ -3,6 +3,25 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.2.0] - 2026-10-13
+
+### Fixed
+- **Settings changes apply with a plain window reload again.** The baked colors
+  used to ride inside the injected script, which the workbench serves from
+  Chromium's cache across window reloads — so a settings change only showed up
+  after quitting VS Code entirely. The config now lives in its own
+  `premium-explorer.json`, fetched fresh on every boot; the script and CSS are
+  static and only change with the extension. One last full restart is needed to
+  pick *this* update up; after that, the reload prompt does what it says.
+- **A selected row's pill keeps readable text.** When the selection does not
+  take the pill over (no `"pills"` in `selectedOverrides`), the label on the
+  pill now keeps its own text color — `rootTextColor` when set, else the
+  theme's foreground — instead of taking `selectedTextColor`, which is picked
+  against the selection fill and could land unreadable on the pill.
+
+### Changed
+- Marketplace category is now **Themes** (was Other).
+
 ## [2.1.9] - 2026-10-13
 
 ### Changed

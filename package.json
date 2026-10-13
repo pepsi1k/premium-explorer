@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.1.9",
+  "version": "2.2.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
     "vscode": "^1.133.0"
   },
   "categories": [
-    "Other"
+    "Themes"
   ],
   "activationEvents": [
     "onStartupFinished"

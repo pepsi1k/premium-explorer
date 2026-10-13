@@ -40,7 +40,7 @@ export async function enableInjection(
   const files = await writeBackgroundFiles(context, config);
   const version = String(context.extension?.packageJSON?.version ?? '0');
   try {
-    apply(status.workbench, version, { css: files.cssUri.fsPath, js: files.jsUri.fsPath });
+    apply(status.workbench, version, { css: files.cssUri.fsPath, js: files.jsUri.fsPath, json: files.jsonUri.fsPath });
   } catch (e) {
     await reportPatchFailure(e, status.workbench.dir);
     return;

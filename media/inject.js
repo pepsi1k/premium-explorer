@@ -9,13 +9,10 @@
 // a future VS Code update could change these class names. All styling is applied
 // inline and tracked via `data-fc-*` markers so we never clobber rows we don't own.
 //
-// The per-workspace color maps and selection options are injected just above this
-// script as `globalThis.__premiumExplorerConfig` by the extension (see backgroundStyles.ts).
+// The per-workspace color maps and selection options live in
+// ./premium-explorer.json next to this script, fetched at boot (see start()).
 (function () {
 	"use strict";
-
-	var config = (typeof globalThis !== "undefined" && globalThis.__premiumExplorerConfig) || null;
-	if (!config || !config.workspaces) { return; }
 
 	// The injected file is global (shared by every window), but colors are scoped
 	// per workspace: WORKSPACES maps a workspace-folder name -> { folder key -> colors }.
@@ -23,15 +20,15 @@
 	// different workspace doesn't inherit another one's colors. A folder key is the
 	// folder's path relative to that workspace folder ("projects/gitops"), lowercased
 	// and "/"-separated — see `folderAt()`, which rebuilds a row's path to match it.
-	var WORKSPACES = config.workspaces;  // wsName -> { relPath -> { root, inner } } (each part: background/edge/pill/text layers)
+	var WORKSPACES;  // wsName -> { relPath -> { root, inner } } (each part: background/edge/pill/text layers)
 	// Selection options are scoped per workspace for the same reason colors are, and
 	// keyed the same way. A single global block meant whichever window generated the
 	// file last decided how a selected row looked *everywhere* — so a workspace left
 	// on the default "invert" would quietly take a neighbour's "#ffffff" away, and
 	// with it every selection on a row outside a coloured folder, since "invert" has
 	// no colour to use there. `paint()` picks this window's before it paints a row.
-	var SELECTIONS = config.selections || {};
-	var SEL = config.selection;          // { bg, text, opacity, border, inactiveDarken, overrides, bold }
+	var SELECTIONS;
+	var SEL;         // { bg, text, opacity, border, inactiveDarken, overrides, bold }
 
 	// How far a row being renamed shifts off the color it would otherwise paint —
 	// enough to register as a change, not enough to look like a different folder.
@@ -337,6 +334,20 @@
 	function watermarkKey(watermark, tint) {
 		if (!watermark.id) { watermark.id = ++nextWatermarkId; }
 		return "w" + watermark.id + ":" + (tint || "");
+	}
+
+	// Marks a selected row whose pill kept its own fill (EM-89). The selection's
+	// text color is picked to read against the selection fill — but this label
+	// sits on the pill, so the generated CSS carves `.label-name` back out of the
+	// selected-label rule on rows carrying `fc-pill-own`, and the label keeps its
+	// normal color: the part's own `textColor` when set (travels as
+	// `--fc-pill-fg`), else the theme's foreground.
+	function setPillOwn(row, fg) { // "" = off, "auto" = theme foreground, else a hex
+		if ((row.dataset.fcPillOwn || "") === fg) { return; }
+		row.dataset.fcPillOwn = fg;
+		row.classList.toggle("fc-pill-own", !!fg);
+		if (fg && fg !== "auto") { row.style.setProperty("--fc-pill-fg", fg); }
+		else { row.style.removeProperty("--fc-pill-fg"); }
 	}
 
 	// The stacked background images — edge bar, text cover, watermark — as one
@@ -834,7 +845,14 @@
 			var pillHover = part && part.pill.hover && labelBg === part.pill.value
 				? part.pill.hover : "";
 
+			// A pill the selection did not take over keeps its own text color too —
+			// the selection's text color is measured against the selection fill, not
+			// against the pill the label actually sits on (EM-89).
+			var pillOwnFg = selLabel && labelBg && !taken("pills")
+				? (textColor || "auto") : "";
+
 			setSelLabel(row, selLabel, !!selFill && !!SEL.bold);
+			setPillOwn(row, pillOwnFg);
 			setEditVars(row, editFill);
 			setHoverVars(row, bgHover, pillHover);
 			setBg(row, background);
@@ -920,7 +938,31 @@
 		waiter.observe(document.body, { subtree: true, childList: true });
 	}
 
-	function start() { waitForExplorer(); }
+	// The baked config is a separate file fetched fresh on every boot. It cannot
+	// ride inside this script: the workbench references the injected files by a
+	// fixed URL, so Chromium serves them from its cache on a window reload and
+	// only a full app restart re-reads them from disk — settings changes looked
+	// ignored (EM-86). This script and the CSS only change with the extension, so
+	// caching them is fine; the part that changes per settings save is this JSON,
+	// and `cache: "no-store"` makes every reload paint the current settings. The
+	// relative URL resolves against workbench.html, which sits in the same
+	// directory the extension mirrors all three files into; CSP-wise the fetch is
+	// connect-src 'self', which the workbench already allows.
+	function start() {
+		fetch("./premium-explorer.json", { cache: "no-store" })
+			.then(function (r) { return r.json(); })
+			.then(function (config) {
+				if (!config || !config.workspaces) { return; }
+				WORKSPACES = config.workspaces;
+				SELECTIONS = config.selections || {};
+				SEL = config.selection;
+				waitForExplorer();
+			})
+			// Missing/unreadable config (e.g. the extension updated the script but
+			// has not generated yet) -> paint nothing; the next generate + reload
+			// picks it up.
+			.catch(function () {});
+	}
 
 	if (document.readyState === "complete") { start(); }
 	else { window.addEventListener("load", start); }

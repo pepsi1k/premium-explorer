@@ -33,6 +33,7 @@ import * as path from 'path';
 /** Written next to `workbench.html`; the injected tags reference these relatively. */
 const CSS_FILE = 'premium-explorer.css';
 const JS_FILE = 'premium-explorer.js';
+const JSON_FILE = 'premium-explorer.json';
 
 /**
  * Pristine `workbench.html`, saved before the first patch so uninstalling restores
@@ -65,6 +66,8 @@ export interface Workbench {
 export interface Sources {
   css: string;
   js: string;
+  /** The baked config the script fetches at boot (never referenced from the HTML). */
+  json: string;
 }
 
 export type Status =
@@ -231,6 +234,7 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
 export function mirror(workbench: Workbench, sources: Sources): void {
   copy(sources.css, path.join(workbench.dir, CSS_FILE));
   copy(sources.js, path.join(workbench.dir, JS_FILE));
+  copy(sources.json, path.join(workbench.dir, JSON_FILE));
 }
 
 /** Restore `workbench.html` and remove everything this module put in the directory. */
@@ -243,7 +247,7 @@ export function remove(workbench: Workbench): void {
     // our own region out, which is what it contributed in the first place.
     write(workbench.html, read(workbench.html).replace(REGION, ''));
   }
-  for (const file of [BACKUP_FILE, CSS_FILE, JS_FILE]) {
+  for (const file of [BACKUP_FILE, CSS_FILE, JS_FILE, JSON_FILE]) {
     try {
       fs.unlinkSync(path.join(workbench.dir, file));
     } catch {
