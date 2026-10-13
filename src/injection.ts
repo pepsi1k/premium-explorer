@@ -6,7 +6,8 @@
  */
 import * as vscode from 'vscode';
 import { FolderColorerConfig } from './config';
-import { unwireCustomCssImports, writeBackgroundFiles } from './backgroundStyles';
+import { writeBackgroundFiles } from './backgroundStyles';
+import { unwireCustomCssImports } from './customCssMigration';
 import { PatchError, apply, checkAccess, inspect, permissionHint, remove } from './workbenchPatch';
 
 /** Set once the user opts in, so a patch lost to a VS Code update can be offered back. */

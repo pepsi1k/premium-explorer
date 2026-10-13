@@ -3,6 +3,14 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.2.1] - 2026-10-13
+
+### Changed
+- Internal restructuring only — no behavior change. The generator module was
+  split into focused files (folder resolution/baking, per-workspace state,
+  generated CSS, watermark artwork, legacy custom-css cleanup), and the
+  architecture docs were brought up to date with the 2.2.0 delivery model.
+
 ## [2.2.0] - 2026-10-13
 
 ### Fixed

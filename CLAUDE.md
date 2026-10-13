@@ -35,11 +35,15 @@ generated sample.
 
 The extension paints almost nothing itself. VS Code's `FileDecorationProvider`
 can only set a badge/tooltip on a label — there is no API for row backgrounds —
-so the real output is a **generated CSS + JS pair** written into the extension's
-`globalStorageUri` and loaded by the workbench. Nothing renders until the user
+so the real output is a **generated CSS + JS + JSON triple** written into the
+extension's `globalStorageUri` and loaded by the workbench: a static painter
+script, a small static CSS, and the baked per-workspace config as JSON, which
+the painter fetches with `cache: "no-store"` on every boot (the script and CSS
+are served from Chromium's cache across window reloads; the JSON is what makes
+a settings change apply on a plain reload). Nothing renders until the user
 turns painting on and reloads.
 
-That pair reaches the workbench one way: [workbenchPatch.ts](src/workbenchPatch.ts)
+Those files reach the workbench one way: [workbenchPatch.ts](src/workbenchPatch.ts)
 patching `workbench.html` ourselves (**Premium Explorer: Enable Background
 Painting**). **The extension is self-sufficient — no companion extension.** Before
 2.1.0 the pair could also be handed to `be5invis.vscode-custom-css`; that path and
@@ -55,21 +59,27 @@ change, or a `**/.git` watcher event:
    settings into a `FolderColorerConfig`. Rules are resolved to absolute paths and
    **sorted deepest-path-first**, so `deepestRuleFor()` returning the first match
    is what implements "a deeper rule wins".
-2. [backgroundStyles.ts](src/backgroundStyles.ts) — `resolveColoredFolders()`
+2. [coloredFolders.ts](src/coloredFolders.ts) — `resolveColoredFolders()`
    expands `git` rules by scanning for `.git` ([repositoryScanner.ts](src/repositoryScanner.ts),
-   depth 8, skips `node_modules`/VCS dirs) and adds `manual` rules directly.
+   depth 8, skips `node_modules`/VCS dirs) and adds `manual` rules directly
+   (watermark artwork comes from [watermarkArt.ts](src/watermarkArt.ts)).
    `bakeAll()` then bakes each folder **shallowest path first**, so an enclosing
    folder is finished before anything nested in it.
 3. [layers.ts](src/layers.ts) — `buildPart()` turns one folder's `PartConfig`
    into ready-to-apply CSS values: background fill, striped edge bar, label pill,
    text style, tiled watermark. Five independent layers, baked separately for the
    `root` row and the `inner` rows.
-4. The result is serialized as `globalThis.__premiumExplorerConfig` and
-   **prepended verbatim** to the static [media/inject.js](media/inject.js), which
-   is written alongside a small CSS file (the CSS covers only what inline styles
-   can't reach: the selected label and the inline rename box).
-5. The pair is delivered: `writeFiles()` writes it to global storage, stamps the
-   version that wrote it, and mirrors it into the patched workbench directory.
+4. [workspaceState.ts](src/workspaceState.ts) merges the baked folders and the
+   selection options into the persisted per-workspace unions, and the result is
+   serialized as `premium-explorer.json` — the file the static
+   [media/inject.js](media/inject.js) fetches at boot. The CSS
+   ([generatedCss.ts](src/generatedCss.ts)) covers only what inline styles can't
+   reach: the selected label, the inline rename box, and hover.
+5. [backgroundStyles.ts](src/backgroundStyles.ts) orchestrates and delivers:
+   `writeFiles()` writes all three to global storage, stamps the version that
+   wrote them, and mirrors them into the patched workbench directory.
+   ([customCssMigration.ts](src/customCssMigration.ts) holds the one-way
+   `unwireCustomCssImports()` cleanup.)
 
 [colors.ts](src/colors.ts) and [workbenchPatch.ts](src/workbenchPatch.ts) are pure
 (no `vscode` import): the first does hashing, hex/rgba math, stripe gradients and
@@ -115,8 +125,9 @@ with every message and prompt left to [injection.ts](src/injection.ts).
   blank them, or the last-generated colors keep painting.
 - **The workbench patch names files; it never carries them.** The tags injected
   into `workbench.html` reference `./premium-explorer.{css,js}` in the same
-  directory, so regenerating means rewriting those two files (`writeFiles()` does
-  it) and the HTML is never revisited. That is also what keeps VS Code's CSP
+  directory (`premium-explorer.json` is never in the HTML — the script fetches it
+  relative to the document), so regenerating means rewriting the three files
+  (`writeFiles()` does it) and the HTML is never revisited. That is also what keeps VS Code's CSP
   intact: a relative `src` is `'self'`, which `script-src` already allows, so
   unlike vscode-custom-css we don't have to delete the policy to inline a script.
   Keep `media/inject.js` free of `innerHTML`-style sinks or the CSP's
@@ -136,7 +147,7 @@ default) and `readPartOverride()` (per-rule override) in
 `premiumExplorer.backgroundWatermarkSymbol` (and the per-rule key of the same
 name) accepts the bare name of any `.svg` in [assets/svg/](assets/svg/) —
 `docker`, `terraform`, … `resolveWatermarkArt()` in
-[backgroundStyles.ts](src/backgroundStyles.ts) scans that directory at generate
+[watermarkArt.ts](src/watermarkArt.ts) scans that directory at generate
 time, so **dropping a file in is the whole code change**. Two things to know:
 
 - The name list in `contributes.configuration` is hand-written and does *not*
@@ -170,7 +181,7 @@ time, so **dropping a file in is the whole code change**. Two things to know:
   descends into a symlinked directory — that avoids finding (and coloring) one repo
   twice, and avoids looping on a link back up the tree. So the only symlinked
   folders left are the ones a rule names by path, and
-  [backgroundStyles.ts](src/backgroundStyles.ts) drops those too unless
+  [coloredFolders.ts](src/coloredFolders.ts) drops those too unless
   `premiumExplorer.symlinkFolders` opts in (default `"none"`); `"dim"` keeps them
   at reduced opacity via `symlinkAdjusted()`, which changes opacity only, so a
   layer the config left off stays off. A symlink *inside* a colored folder is
