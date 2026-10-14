@@ -9,8 +9,8 @@
  * and reuses it wholesale, falling back to the shipped default when nothing
  * encloses the folder (see NO_ANCESTOR_FALLBACK).
  */
-import { Fill, WatermarkArt, resolveFill, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
-import { WATERMARK_COLOR_ORIGINAL, LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig } from './config';
+import { Fill, Radius, WatermarkArt, fillDirectionOf, fillHasVertical, isSquare, markDataUri, resolveFill, resolvePadding, resolveRadius, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
+import { WATERMARK_COLOR_ORIGINAL, FillScale, LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig, RadiusScale } from './config';
 
 /** A colored folder: its base color, its source path, and its resolved root/inner layers. */
 export interface ColoredFolder {
@@ -18,9 +18,21 @@ export interface ColoredFolder {
   hex: string;
   /** Unique colour sequence for the striped edge; first entry is `hex`. */
   sequence: string[];
-  /** Artwork for the watermark (the rule's `backgroundWatermark`, else the name's initial). */
-  art: WatermarkArt;
+  /**
+   * Artwork for the watermark (the rule's `backgroundWatermarkSymbol`, else the
+   * global one, else the name's initial). More than one entry mixes them across
+   * the canvas.
+   */
+  arts: WatermarkArt[];
+  /**
+   * Artwork for the `mark` layer, keyed by the `*Mark` source that asked for it —
+   * resolving one needs the filesystem and the shipped glyph set, so it is done
+   * once per folder, up front, rather than inside the bake.
+   */
+  markArt: Record<string, WatermarkArt>;
   absPath: string;
+  /** Whether corner radii round each row or the folder's whole rendered block. */
+  radiusScale: RadiusScale;
   root: PartConfig;
   inner: PartConfig;
 }
@@ -39,6 +51,14 @@ export interface Layer {
    * composites "the row's color" and cannot parse a gradient string.
    */
   ground?: string;
+  /**
+   * `"block"` only, and only on a gradient `value`: stretch this one fill over the
+   * folder's rendered block instead of repainting it inside every row. The block's
+   * height is only known in the browser, so the painter does the sizing — the one
+   * deliberate bend of "bake at generate time" (docs/fill-spec.md §2). Absent =
+   * per-row, which is what every solid and every horizontal fill wants.
+   */
+  scale?: 'block';
 }
 
 /**
@@ -50,6 +70,24 @@ export interface Layer {
 export interface StripeLayer {
   image: string;
   width: number;
+}
+
+/**
+ * The baked mark: one stamp of artwork placed just after the row's text (empty =
+ * off). The painter positions it, because where a row's text ends is only known
+ * in the browser (`textEnd()` in inject.js).
+ */
+export interface MarkLayer {
+  image: string;
+  size: number;
+  gap: number;
+  /**
+   * How much of the pill's right padding exists only to enclose this mark
+   * (`markInPill`). The painter subtracts it when placing the mark, because
+   * `textEnd()` measures the label's padded *box*: without the subtraction the
+   * widened pill would push the mark straight back outside it.
+   */
+  inset: number;
 }
 
 /** The baked watermark: a tiled `url(data:image/svg+xml,...)` pattern (empty = off). */
@@ -90,12 +128,20 @@ export interface Part {
   edge: StripeLayer;
   /** Rounded background behind the label (rgba), or empty. */
   pill: Layer;
-  /** Pill corner radius in px. */
-  pillRadius: number;
+  /** Pill corner radii in px, CSS order (top-left, top-right, bottom-right, bottom-left). */
+  pillRadius: number[];
+  /** Pill padding in px, CSS order (top, right, bottom, left). */
+  pillPadding: number[];
+  /** Row-fill corner radii in px, same order. All zero = square (the default). */
+  backgroundRadius: number[];
+  /** Edge-bar corner radii in px, same order; only the left pair can show. */
+  edgeRadius: number[];
   /** Label text color, or `""` to leave it to the theme. */
   text: string;
   bold: boolean;
   italic: boolean;
+  /** One fixed glyph stamped after the row's label. */
+  mark: MarkLayer;
   /** Faint tiled artwork behind the row. */
   watermark: WatermarkLayer;
   /** The folder's opaque base color — used by the `invert` selection highlight. */
@@ -116,6 +162,7 @@ export function buildLayer(
   inherited: Layer | undefined,
   fallback: LayerStyle,
   fill?: Fill,
+  fillScale: FillScale = 'row',
 ): Layer {
   let effective = style;
   if (effective === 'inherit') {
@@ -133,10 +180,16 @@ export function buildLayer(
   if (fill !== undefined) {
     const normal = resolveFill(fill, opacity);
     const hover = resolveFill(fill, opacity, HOVER_LIGHTEN, HOVER_OPACITY_BOOST);
+    // Only a gradient can be stretched — a one-stop fill is a flat colour, and
+    // `auto` asks the direction: a purely horizontal fill reads exactly the same
+    // whether it spans one row or twenty, so it stays per-row.
+    const block = !!normal.image && (fillScale === 'block'
+      || (fillScale === 'auto' && fillHasVertical(fillDirectionOf(fill))));
     return {
       value: normal.color || normal.image,
       hover: hover.color || hover.image,
       ...(normal.image ? { ground: hexToRgba(normal.hex, normal.alpha) } : {}),
+      ...(block ? { scale: 'block' as const } : {}),
     };
   }
   const hex = color ?? baseHex;
@@ -185,7 +238,7 @@ export function buildStripe(p: PartConfig, sequence: string[], inherited: Stripe
  * size/brightness/position, seeded off the folder so it is unique but stable.
  * No watermark -> the layer stays off.
  */
-export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt, seed: string, inherited: WatermarkLayer | undefined): WatermarkLayer {
+export function buildWatermark(p: PartConfig, fillHex: string, arts: WatermarkArt[], seed: string, inherited: WatermarkLayer | undefined): WatermarkLayer {
   let effective: LayerStyle = p.watermarkStyle;
   if (effective === 'inherit') {
     if (inherited) {
@@ -193,7 +246,8 @@ export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt
     }
     effective = NO_ANCESTOR_FALLBACK.watermark;
   }
-  if (effective !== 'solid' || !art.content) {
+  const drawable = arts.filter(a => !!a.content);
+  if (effective !== 'solid' || !drawable.length) {
     return { image: '', size: 0, tint: '', auto: false, contrast: 0, textDim: 0, spots: [] };
   }
   // With no `watermarkColor` the watermark inherits the row's own fill colour, so the
@@ -221,8 +275,8 @@ export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt
   // and needs `spots` to do it per watermark rather than per pixel.
   const cleared = p.watermarkDimStyle !== 'text' ? p.watermarkDim : 0;
   const covers = p.watermarkDimStyle !== 'radius';
-  const pattern = watermarkPatternDataUri(art, seed, canvas, p.watermarkSize, p.watermarkDensity, p.watermarkVariation, p.watermarkRotation,
-    color, p.watermarkOpacity, cleared, p.watermarkDimWidth, p.watermarkDimHeight, covers);
+  const pattern = watermarkPatternDataUri(drawable, seed, canvas, p.watermarkSize, p.watermarkDensity, p.watermarkVariation, p.watermarkRotation,
+    color, p.watermarkOpacity, cleared, p.watermarkDimWidth, p.watermarkDimHeight, covers, p.watermarkLayout);
   return {
     // No hover variant: a whole-canvas pattern is ~20KB and it is embedded per
     // folder, so a second copy would dominate the generated file for an effect
@@ -237,6 +291,49 @@ export function buildWatermark(p: PartConfig, fillHex: string, art: WatermarkArt
     textDim: covers ? p.watermarkDim : 0,
     spots: pattern.spots,
   };
+}
+
+/**
+ * Bake the mark: one copy of the artwork, at full strength, keeping its own
+ * colours unless a tint is named. No `inherit` here — a mark is a deliberate,
+ * per-folder choice, and inheriting one would stamp a parent's logo onto every
+ * nested rule that never asked for it.
+ */
+export function buildMark(p: PartConfig, art: WatermarkArt | undefined, inset: number): MarkLayer {
+  if (!p.mark || !art || !art.content) {
+    return { image: '', size: 0, gap: 0, inset: 0 };
+  }
+  return {
+    image: markDataUri(art, p.markColor ?? ''),
+    size: Math.max(4, Math.round(p.markSize)),
+    gap: Math.round(p.markGap),
+    inset,
+  };
+}
+
+/** The trailing space left between an enclosed mark and the pill's right edge. */
+const MARK_IN_PILL_TRAIL = 5;
+
+/**
+ * How far the pill has to grow rightwards to enclose the mark: the gap before it,
+ * the mark itself, and a trailing space so it is not flush against the edge. Zero
+ * unless both a mark and a pill are actually painted — the flag is a no-op, never
+ * an error, where either is missing.
+ */
+function markInset(p: PartConfig, hasMark: boolean, hasPill: boolean): number {
+  if (!p.markInPill || !hasMark || !hasPill) {
+    return 0;
+  }
+  return Math.round(p.markGap) + Math.max(4, Math.round(p.markSize)) + MARK_IN_PILL_TRAIL;
+}
+
+/**
+ * Resolve one layer's corner radii, letting an `inherit` layer take the enclosing
+ * folder's shape when this one names no radius of its own.
+ */
+function inheritedRadius(style: LayerStyle, own: Radius, inherited: number[] | undefined): number[] {
+  const corners = resolveRadius(own);
+  return style === 'inherit' && inherited && isSquare(corners) ? inherited : corners;
 }
 
 /** Bake one row-kind's {@link PartConfig} into ready-to-apply CSS colors. */
@@ -256,15 +353,30 @@ export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Par
     : undefined)
     ?? p.backgroundColor
     ?? (p.backgroundStyle === 'inherit' && inheritFrom ? inheritFrom.solid : baseHex);
+  // `markInPill` grows the pill rightwards to enclose the mark. Both layers have to
+  // be on for it to mean anything, so the pill is built first and the flag read off
+  // the result rather than off the config.
+  const pill = buildLayer(p.pill, p.pillColor, p.pillOpacity, baseHex, inheritFrom?.pill, NO_ANCESTOR_FALLBACK.pill, p.pillFill);
+  const markArt = p.mark ? folder.markArt[p.mark] : undefined;
+  const inset = markInset(p, !!(markArt && markArt.content), !!pill.value);
+  const pillPadding = resolvePadding(p.pillPadding);
+  pillPadding[1] += inset;
   return {
-    background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background, p.backgroundFill),
+    background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background, p.backgroundFill, p.backgroundFillScale),
     edge: buildStripe(p, folder.sequence, inheritFrom?.edge),
-    pill: buildLayer(p.pill, p.pillColor, p.pillOpacity, baseHex, inheritFrom?.pill, NO_ANCESTOR_FALLBACK.pill, p.pillFill),
-    pillRadius: p.pillRadius,
+    pill,
+    // An `inherit` layer adopts the ancestor's *shape* along with its colours, but
+    // only where this part asks for no rounding of its own: a rule that names a
+    // radius means it, and square is how "none" is spelt.
+    pillRadius: inheritedRadius(p.pill, p.pillRadius, inheritFrom?.pillRadius),
+    pillPadding: pillPadding,
+    backgroundRadius: inheritedRadius(p.backgroundStyle, p.backgroundRadius, inheritFrom?.backgroundRadius),
+    edgeRadius: inheritedRadius(p.edge, p.edgeRadius, inheritFrom?.edgeRadius),
     text: p.textColor ?? '',
     bold: p.textStyle === 'bold' || p.textStyle === 'bold-italic',
     italic: p.textStyle === 'italic' || p.textStyle === 'bold-italic',
-    watermark: buildWatermark(p, fillHex, folder.art, folder.name, inheritFrom?.watermark),
+    mark: buildMark(p, markArt, inset),
+    watermark: buildWatermark(p, fillHex, folder.arts, folder.name, inheritFrom?.watermark),
     solid: fillHex,
   };
 }

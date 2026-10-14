@@ -16,7 +16,7 @@
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { Fill, FillDirection, HEX_RE, StripeBlend, hashString, normalizePath, parseFill } from './colors';
+import { Fill, FillDirection, HEX_RE, Radius, StripeBlend, WatermarkLayout, hashString, normalizePath, parseFill, parseRadius } from './colors';
 
 export const CONFIG_SECTION = 'premiumExplorer';
 
@@ -64,6 +64,38 @@ function parseLayerStyle(value: unknown): LayerStyle | undefined {
   return LAYER_STYLES.includes(value as LayerStyle) ? value as LayerStyle : undefined;
 }
 
+/**
+ * How far a multi-stop background fill is stretched.
+ *   `row`   — each row paints the whole fill in its own 22px box (the historical
+ *             behaviour, and the only one that makes sense for a horizontal fill).
+ *   `block` — one fill stretched over the folder's rendered block, each row
+ *             showing the slice that belongs at its depth. The folder's height is
+ *             only known in the browser, so the painter sizes it (see inject.js).
+ *   `auto`  — `block` for any direction with a vertical component, `row` for a
+ *             purely horizontal one. A diagonal or vertical fill has ~7% of its
+ *             colour change left on the vertical axis inside one row, which is why
+ *             diagonals used to be indistinguishable from horizontal ones (EM-104).
+ */
+export type FillScale = 'auto' | 'row' | 'block';
+
+/**
+ * What a corner radius is rounded *around*.
+ *   `block` — the folder's rendered block reads as one plate: the root row takes
+ *             the top corners, the last row rendered under it the bottom ones,
+ *             everything between stays square (the default — a stack of
+ *             separately rounded 22px bars is almost never what "rounded" means).
+ *   `row`   — every row rounds its own box.
+ * Inert until a radius is actually set.
+ */
+export type RadiusScale = 'row' | 'block';
+function parseRadiusScale(value: unknown): RadiusScale | undefined {
+  return value === 'row' || value === 'block' ? value : undefined;
+}
+const FILL_SCALES: readonly string[] = ['auto', 'row', 'block'];
+function parseFillScale(value: unknown): FillScale | undefined {
+  return typeof value === 'string' && FILL_SCALES.includes(value) ? value as FillScale : undefined;
+}
+
 const FILL_DIRECTIONS: readonly string[] = ['vertical', 'horizontal', 'diagonal', 'diagonal-reverse'];
 function parseFillDirection(value: unknown): FillDirection | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -106,6 +138,8 @@ export interface PartConfig {
    * wins over `backgroundColor`.
    */
   backgroundFill?: Fill;
+  /** How far {@link backgroundFill} is stretched: per row, or over the folder's block. */
+  backgroundFillScale: FillScale;
   backgroundOpacity: number;
   edge: LayerStyle;
   edgeColor?: string;
@@ -132,9 +166,52 @@ export interface PartConfig {
    */
   pillFill?: Fill;
   pillOpacity: number;
-  pillRadius: number;
+  /** Pill corner radius: a number, or the per-corner CSS form (see {@link Radius}). */
+  pillRadius: Radius;
+  /**
+   * Space the pill leaves around the label, in px. A single number is
+   * **horizontal only** — the shipped pill is `0 5px` and `5` has to keep meaning
+   * that; `[v, h]` and the three/four-value CSS forms work as in CSS.
+   */
+  pillPadding: Radius;
+  /**
+   * Grow the pill rightwards so it encloses the {@link mark} instead of letting it
+   * sit just outside. A no-op where no pill or no mark is painted.
+   */
+  markInPill: boolean;
+  /**
+   * Corner radius for the row fill. Applied as a `border-radius` on the row, which
+   * clips *every* background layer at once — fill, edge bar and watermark — so it
+   * rounds the whole painted plate. `radiusScale` decides whether that is the row
+   * or the folder's block.
+   */
+  backgroundRadius: Radius;
+  /**
+   * Corner radius for the edge bar. The bar is a background image and an image
+   * cannot carry a radius of its own, so this rounds the row's *left* corners —
+   * exactly the two the bar occupies. An inset capsule bar would need its own
+   * element and is deliberately out of scope (see the key's description).
+   */
+  edgeRadius: Radius;
   textStyle: TextStyle;
   textColor?: string;
+  /**
+   * A single fixed glyph stamped just after the label — the **mark** (EM-94).
+   * Takes the same sources as `backgroundWatermarkSymbol` (a shipped glyph name,
+   * an `.svg` path, inline markup, a data URI, or a character), and keeps the
+   * drawing's own colours unless {@link markColor} names a tint. Empty = no mark.
+   *
+   * It does not compete with git's letter: that one lives in VS Code's single
+   * `FileDecoration` badge slot, while the mark is painted by the injected CSS, so
+   * both can show at once.
+   */
+  mark?: string;
+  /** Hex tint for the mark; unset keeps an SVG's own colours. */
+  markColor?: string;
+  /** The mark's size in px (it is square). */
+  markSize: number;
+  /** Gap in px between the end of the row's text and the mark. */
+  markGap: number;
   /** The tiled watermark behind the row. */
   watermarkStyle: LayerStyle;
   /** Hex tint, or `"original"` to keep an SVG's own colors. */
@@ -154,6 +231,12 @@ export interface PartConfig {
   watermarkDim: number;
   /** Which dimming applies: the baked clearing, the text cover, or both. */
   watermarkDimStyle: WatermarkDimStyle;
+  /**
+   * How the copies are arranged on the canvas: the jittered field, a band at the
+   * right edge, one line in the top band, or a single corner badge (see
+   * {@link WatermarkLayout}).
+   */
+  watermarkLayout: WatermarkLayout;
   /** The lens's width in px — the clearing is baked into the canvas, so it is fixed. */
   watermarkDimWidth: number;
   /** The lens's height in px: how far apart its points sit down the canvas. */
@@ -181,6 +264,11 @@ export interface PartConfig {
  *              into, which the clearing alone cannot know about.
  */
 export type WatermarkDimStyle = 'smart' | 'text' | 'radius';
+
+const WATERMARK_LAYOUTS: readonly string[] = ['scatter', 'right-edge', 'row', 'corner'];
+function parseWatermarkLayout(value: unknown): WatermarkLayout | undefined {
+  return typeof value === 'string' && WATERMARK_LAYOUTS.includes(value) ? value as WatermarkLayout : undefined;
+}
 const WATERMARK_DIM_STYLES: readonly string[] = ['smart', 'text', 'radius'];
 
 function parseDimStyle(raw: unknown): WatermarkDimStyle | undefined {
@@ -189,18 +277,20 @@ function parseDimStyle(raw: unknown): WatermarkDimStyle | undefined {
 
 /** Global default parts, mirroring the defaults contributed in package.json. */
 const ROOT_DEFAULTS: PartConfig = {
-  backgroundStyle: 'solid', backgroundOpacity: 0.5,
+  backgroundStyle: 'solid', backgroundFillScale: 'auto', backgroundOpacity: 0.5,
   edge: 'none', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'none', pillOpacity: 1, pillRadius: 6,
+  pill: 'none', pillOpacity: 1, pillRadius: 6, pillPadding: 5, markInPill: false, backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
-  watermarkStyle: 'none', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
+  markSize: 14, markGap: 6,
+  watermarkStyle: 'none', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkLayout: 'scatter', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };
 const INNER_DEFAULTS: PartConfig = {
-  backgroundStyle: 'inherit', backgroundOpacity: 0.15,
+  backgroundStyle: 'inherit', backgroundFillScale: 'auto', backgroundOpacity: 0.15,
   edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'inherit', pillOpacity: 1, pillRadius: 3,
+  pill: 'inherit', pillOpacity: 1, pillRadius: 3, pillPadding: 5, markInPill: false, backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
-  watermarkStyle: 'inherit', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
+  markSize: 14, markGap: 6,
+  watermarkStyle: 'inherit', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkLayout: 'scatter', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };
 
 /**
@@ -224,8 +314,17 @@ export interface ResolvedRule {
    * `assets/svg` (`docker`, `terraform`, ...), a character/emoji, or a path to an
    * `.svg` file (also inline `<svg>` markup or a data URI). Falls back to the
    * global `backgroundWatermarkSymbol`, then to the folder name's initial.
+   *
+   * More than one entry mixes them: every copy on the canvas picks one, seeded off
+   * the folder so the mix is stable (EM-91 §5/§6).
    */
-  backgroundWatermarkSymbol?: string;
+  backgroundWatermarkSymbol?: string[];
+  /**
+   * Whether this folder's corner radii round each row or the whole block. Not a
+   * layer key: block rounding needs the root row and the last inner row to agree,
+   * so it belongs to the folder, not to one row-kind.
+   */
+  radiusScale?: RadiusScale;
   /** Per-rule layer overrides for the root row / inner rows (merged over the globals). */
   root?: Partial<PartConfig>;
   inner?: Partial<PartConfig>;
@@ -256,6 +355,29 @@ export interface SelectionConfig {
   watermark: string;
   /** 0..1 — how far the `"auto"` watermark sits off the selection color. */
   watermarkContrast: number;
+  /** How a row being renamed is treated (see {@link RenameStyle}). */
+  renameStyle: RenameStyle;
+}
+
+/**
+ * How a row looks while its inline rename box is open, on top of the step the row
+ * itself takes (`EDIT_SHIFT` in inject.js).
+ *   `dim`   — the box gets out of the way entirely: transparent field, the row's
+ *             own fill and watermark carrying through, a border marking where the
+ *             typing goes (the default, and what shipped before this key).
+ *   `field` — the box shows as a real inset text field in the theme's own input
+ *             colours, over the shifted row.
+ *   `edge`  — `dim`, plus the edge bar switches to the theme's focus accent for as
+ *             long as the box is open. This is the **one** exception to "the edge
+ *             bar always keeps its own colours": it is opt-in, it lasts only while
+ *             a rename is actually open, and renaming — unlike selection — is the
+ *             one state where saying *where the typing is* outranks saying which
+ *             folder the row belongs to.
+ */
+export type RenameStyle = 'dim' | 'field' | 'edge';
+const RENAME_STYLES: readonly string[] = ['dim', 'field', 'edge'];
+function parseRenameStyle(value: unknown): RenameStyle | undefined {
+  return typeof value === 'string' && RENAME_STYLES.includes(value) ? value as RenameStyle : undefined;
 }
 
 /**
@@ -267,6 +389,90 @@ export interface SelectionConfig {
 export type SelectedOverride = 'background' | 'watermarks' | 'text-color' | 'pills';
 const SELECTED_OVERRIDES: readonly string[] = ['background', 'watermarks', 'text-color', 'pills'];
 
+/* ------------------------------------------------------------------------- *
+ * Git marks (EM-96)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * How Git's status marks are painted once a background is under them.
+ *   `bare`    — exactly what VS Code does: the status colour untouched. Over an
+ *               amber fill that is 3.4:1 for modified and 1.3:1 for deleted, so
+ *               this is the state the ticket calls a defect; it is kept as an
+ *               opt-out, not as the default.
+ *   `chip`    — the filename, the letter and the folder dot are lifted clear of
+ *               the row, and the letter gets a plate stepped off the row's ground
+ *               with a border in Git's own colour. The default **wherever a
+ *               background actually paints**; a row with no fill keeps `bare`,
+ *               because there is nothing there to fail against.
+ *   `outline` — the lift, with a border in the lifted hue and no plate.
+ *   `solid`   — the status colour becomes the plate and the letter is knocked out
+ *               of it, lifted until the knockout reads.
+ *   `none`    — the letter and the dot are hidden; the filename still lifts.
+ */
+export type GitMarkStyle = 'bare' | 'chip' | 'outline' | 'solid' | 'none';
+const GIT_MARK_STYLES: readonly string[] = ['bare', 'chip', 'outline', 'solid', 'none'];
+function parseGitMarkStyle(value: unknown): GitMarkStyle | undefined {
+  return typeof value === 'string' && GIT_MARK_STYLES.includes(value) ? value as GitMarkStyle : undefined;
+}
+
+/** The four statuses Git decorates a row with. */
+export type GitStatus = 'modified' | 'added' | 'untracked' | 'deleted';
+const GIT_STATUSES: readonly GitStatus[] = ['modified', 'added', 'untracked', 'deleted'];
+
+/**
+ * One of the git-mark colours: a hex, `"auto"` (derived in the painter off what
+ * the row actually shows — see docs/fill-spec.md §4), `"off"` (leave whatever VS
+ * Code painted alone), or a per-status map of those.
+ *
+ * The handoff's mock hexes (`#E2C08D` modified, lifted `#F8E7C8`, …) are
+ * dark-theme constants and are deliberately **not** defaults: `"auto"` derives
+ * them from the live theme and the live fill instead.
+ */
+export type GitColor = string | Partial<Record<GitStatus, string>>;
+
+function parseGitColor(raw: unknown): GitColor | undefined {
+  if (typeof raw === 'string') {
+    const v = raw.trim().toLowerCase();
+    return v === 'auto' || v === 'off' ? v : hexOrUndefined(raw);
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const map: Partial<Record<GitStatus, string>> = {};
+  for (const status of GIT_STATUSES) {
+    const one = parseGitColor((raw as Record<string, unknown>)[status]);
+    if (typeof one === 'string') {
+      map[status] = one;
+    }
+  }
+  return Object.keys(map).length ? map : undefined;
+}
+
+/** All `premiumExplorer.git*` settings, resolved. */
+export interface GitMarkConfig {
+  style: GitMarkStyle;
+  /** The status letter's ink. */
+  color: GitColor;
+  /** The letter's plate (`chip`/`solid`). */
+  background: GitColor;
+  /** The letter's border. */
+  border: GitColor;
+  /** The filename's colour. */
+  label: GitColor;
+  /** The dot on a folder containing changes. */
+  folderDot: GitColor;
+  /**
+   * The **symlink arrow** VS Code appends to the same badge (`⤷`). Only applies
+   * where it is the whole badge: beside a status letter the two share one
+   * `::after`, and Git's colouring governs. `"auto"` is the tree's icon
+   * foreground, and a selected row swaps it for `selectedTextColor`, exactly as
+   * the letter does (design §7).
+   */
+  symlink: GitColor;
+  /** The WCAG contrast ratio an `"auto"` colour is lifted to. */
+  contrast: number;
+}
+
 /** All settings, resolved into ready-to-use values. */
 export interface FolderColorerConfig {
   enabled: boolean;
@@ -277,11 +483,22 @@ export interface FolderColorerConfig {
   /** How many colours an auto-derived edge sequence uses (1 = a plain solid bar). */
   edgeColorCount: number;
   /**
-   * Default artwork for the watermark: a built-in glyph name, a character/emoji,
-   * or a path to an `.svg` file. Empty = each folder uses the first letter of
-   * its own name.
+   * Default artwork for the watermark: built-in glyph names, characters/emoji, or
+   * paths to `.svg` files. Empty = each folder uses the first letter of its own
+   * name; more than one entry mixes them across the canvas.
    */
-  backgroundWatermarkSymbol: string;
+  backgroundWatermarkSymbol: string[];
+  /** Whether corner radii round each row or the folder's whole block. */
+  radiusScale: RadiusScale;
+  /** How Git's status marks are kept readable over a painted row (EM-96). */
+  git: GitMarkConfig;
+  /**
+   * Artwork stamped on a folder that is itself a symlink and that a rule names —
+   * **our own** mark, because VS Code draws none (EM-97). Empty = no mark.
+   */
+  symlinkMark?: string;
+  /** Tint for {@link symlinkMark}; unset keeps an SVG's own colours. */
+  symlinkMarkTint?: string;
   /** Global default layers for the repo root row and the inner rows. */
   root: PartConfig;
   inner: PartConfig;
@@ -299,6 +516,7 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
     backgroundStyle: parseLayerStyle(get(`${prefix}BackgroundStyle`)) ?? defaults.backgroundStyle,
     backgroundColor: hexOrUndefined(get(`${prefix}BackgroundColor`)),
     backgroundFill: parseFill(get(`${prefix}BackgroundFill`)),
+    backgroundFillScale: parseFillScale(get(`${prefix}BackgroundFillScale`)) ?? defaults.backgroundFillScale,
     backgroundOpacity: numberOrUndefined(get(`${prefix}BackgroundOpacity`)) ?? defaults.backgroundOpacity,
     edge: parseLayerStyle(get(`${prefix}Edge`)) ?? defaults.edge,
     edgeColor: hexOrUndefined(get(`${prefix}EdgeColor`)),
@@ -312,14 +530,23 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
     pillColor: hexOrUndefined(get(`${prefix}PillColor`)),
     pillFill: parseFill(get(`${prefix}PillFill`)),
     pillOpacity: numberOrUndefined(get(`${prefix}PillOpacity`)) ?? defaults.pillOpacity,
-    pillRadius: numberOrUndefined(get(`${prefix}PillRadius`)) ?? defaults.pillRadius,
+    pillRadius: parseRadius(get(`${prefix}PillRadius`)) ?? defaults.pillRadius,
+    pillPadding: parseRadius(get(`${prefix}PillPadding`)) ?? defaults.pillPadding,
+    markInPill: get(`${prefix}MarkInPill`) === true,
+    backgroundRadius: parseRadius(get(`${prefix}BackgroundRadius`)) ?? defaults.backgroundRadius,
+    edgeRadius: parseRadius(get(`${prefix}EdgeRadius`)) ?? defaults.edgeRadius,
     textStyle: parseTextStyle(get(`${prefix}TextStyle`)) ?? defaults.textStyle,
     textColor: hexOrUndefined(get(`${prefix}TextColor`)),
+    mark: readWatermarkSource(get(`${prefix}Mark`)),
+    markColor: hexOrUndefined(get(`${prefix}MarkColor`)),
+    markSize: numberOrUndefined(get(`${prefix}MarkSize`)) ?? defaults.markSize,
+    markGap: numberOrUndefined(get(`${prefix}MarkGap`)) ?? defaults.markGap,
     watermarkStyle: parseLayerStyle(get(`${prefix}WatermarkStyle`)) ?? defaults.watermarkStyle,
     watermarkColor: watermarkColorOrUndefined(get(`${prefix}WatermarkColor`)),
     watermarkContrast: numberOrUndefined(get(`${prefix}WatermarkContrast`)) ?? defaults.watermarkContrast,
     watermarkDim: numberOrUndefined(get(`${prefix}WatermarkDim`)) ?? defaults.watermarkDim,
     watermarkDimStyle: parseDimStyle(get(`${prefix}WatermarkDimStyle`)) ?? defaults.watermarkDimStyle,
+    watermarkLayout: parseWatermarkLayout(get(`${prefix}WatermarkLayout`)) ?? defaults.watermarkLayout,
     watermarkDimWidth: numberOrUndefined(get(`${prefix}WatermarkDimWidth`)) ?? defaults.watermarkDimWidth,
     watermarkDimHeight: numberOrUndefined(get(`${prefix}WatermarkDimHeight`)) ?? defaults.watermarkDimHeight,
     watermarkOpacity: numberOrUndefined(get(`${prefix}WatermarkOpacity`)) ?? defaults.watermarkOpacity,
@@ -340,6 +567,8 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (backgroundColor) { o.backgroundColor = backgroundColor; }
   const backgroundFill = parseFill(entry[`${prefix}BackgroundFill`]);
   if (backgroundFill !== undefined) { o.backgroundFill = backgroundFill; }
+  const backgroundFillScale = parseFillScale(entry[`${prefix}BackgroundFillScale`]);
+  if (backgroundFillScale) { o.backgroundFillScale = backgroundFillScale; }
   const backgroundOpacity = numberOrUndefined(entry[`${prefix}BackgroundOpacity`]);
   if (backgroundOpacity !== undefined) { o.backgroundOpacity = backgroundOpacity; }
   const edge = parseLayerStyle(entry[`${prefix}Edge`]);
@@ -368,6 +597,8 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (watermarkDim !== undefined) { o.watermarkDim = watermarkDim; }
   const watermarkDimStyle = parseDimStyle(entry[`${prefix}WatermarkDimStyle`]);
   if (watermarkDimStyle) { o.watermarkDimStyle = watermarkDimStyle; }
+  const watermarkLayout = parseWatermarkLayout(entry[`${prefix}WatermarkLayout`]);
+  if (watermarkLayout) { o.watermarkLayout = watermarkLayout; }
   const watermarkDimWidth = numberOrUndefined(entry[`${prefix}WatermarkDimWidth`]);
   if (watermarkDimWidth !== undefined) { o.watermarkDimWidth = watermarkDimWidth; }
   const watermarkDimHeight = numberOrUndefined(entry[`${prefix}WatermarkDimHeight`]);
@@ -392,12 +623,27 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (pillFill !== undefined) { o.pillFill = pillFill; }
   const pillOpacity = numberOrUndefined(entry[`${prefix}PillOpacity`]);
   if (pillOpacity !== undefined) { o.pillOpacity = pillOpacity; }
-  const pillRadius = numberOrUndefined(entry[`${prefix}PillRadius`]);
+  const pillRadius = parseRadius(entry[`${prefix}PillRadius`]);
   if (pillRadius !== undefined) { o.pillRadius = pillRadius; }
+  const pillPadding = parseRadius(entry[`${prefix}PillPadding`]);
+  if (pillPadding !== undefined) { o.pillPadding = pillPadding; }
+  if (entry[`${prefix}MarkInPill`] === true) { o.markInPill = true; }
+  const backgroundRadius = parseRadius(entry[`${prefix}BackgroundRadius`]);
+  if (backgroundRadius !== undefined) { o.backgroundRadius = backgroundRadius; }
+  const edgeRadius = parseRadius(entry[`${prefix}EdgeRadius`]);
+  if (edgeRadius !== undefined) { o.edgeRadius = edgeRadius; }
   const textStyle = parseTextStyle(entry[`${prefix}TextStyle`]);
   if (textStyle) { o.textStyle = textStyle; }
   const textColor = hexOrUndefined(entry[`${prefix}TextColor`]);
   if (textColor) { o.textColor = textColor; }
+  const mark = readWatermarkSource(entry[`${prefix}Mark`]);
+  if (mark) { o.mark = mark; }
+  const markColor = hexOrUndefined(entry[`${prefix}MarkColor`]);
+  if (markColor) { o.markColor = markColor; }
+  const markSize = numberOrUndefined(entry[`${prefix}MarkSize`]);
+  if (markSize !== undefined) { o.markSize = markSize; }
+  const markGap = numberOrUndefined(entry[`${prefix}MarkGap`]);
+  if (markGap !== undefined) { o.markGap = markGap; }
   return Object.keys(o).length ? o : undefined;
 }
 
@@ -417,9 +663,22 @@ export function readConfig(): FolderColorerConfig {
     edgeColorCount: cfg.get<number>('edgeColorCount', 3),
     // `backgroundWatermark` is the pre-1.3 name, still read so an existing config
     // keeps its artwork; the new key wins wherever both are set.
-    backgroundWatermarkSymbol: readWatermarkSource(
-      cfg.get<string>('backgroundWatermarkSymbol', '') || cfg.get<string>('backgroundWatermark', ''),
-    ) ?? '',
+    backgroundWatermarkSymbol: readWatermarkSources(
+      cfg.get('backgroundWatermarkSymbol') || cfg.get('backgroundWatermark'),
+    ) ?? [],
+    radiusScale: parseRadiusScale(cfg.get<string>('radiusScale')) ?? 'block',
+    git: {
+      style: parseGitMarkStyle(cfg.get<string>('gitMarkStyle')) ?? 'chip',
+      color: parseGitColor(cfg.get('gitMarkColor')) ?? 'auto',
+      background: parseGitColor(cfg.get('gitMarkBackgroundColor')) ?? 'auto',
+      border: parseGitColor(cfg.get('gitMarkBorderColor')) ?? 'auto',
+      label: parseGitColor(cfg.get('gitLabelColor')) ?? 'auto',
+      folderDot: parseGitColor(cfg.get('gitFolderDotColor')) ?? 'auto',
+      symlink: parseGitColor(cfg.get('symlinkMarkColor')) ?? 'auto',
+      contrast: cfg.get<number>('gitMarkContrast', 4.5),
+    },
+    symlinkMark: readWatermarkSource(cfg.get('symlinkMark')),
+    symlinkMarkTint: hexOrUndefined(cfg.get('symlinkMarkTint')),
     root: readPart(get, 'root', ROOT_DEFAULTS),
     inner: readPart(get, 'inner', INNER_DEFAULTS),
     selection: {
@@ -434,6 +693,7 @@ export function readConfig(): FolderColorerConfig {
       overrides: parseOverrides(cfg.get<string[]>('selectedOverrides', [])),
       watermark: cfg.get<string>('selectedWatermarkColor', 'auto'),
       watermarkContrast: cfg.get<number>('selectedWatermarkContrast', 0.08),
+      renameStyle: parseRenameStyle(cfg.get<string>('selectedRenameStyle')) ?? 'dim',
     },
     rules: resolveRules(cfg),
   };
@@ -485,10 +745,11 @@ function resolveRules(cfg: vscode.WorkspaceConfiguration): ResolvedRule[] {
 
     const root = readPartOverride(entry, 'root');
     const inner = readPartOverride(entry, 'inner');
-    const watermark = readWatermarkSource(entry.backgroundWatermarkSymbol ?? entry.backgroundWatermark);
+    const watermark = readWatermarkSources(entry.backgroundWatermarkSymbol ?? entry.backgroundWatermark);
 
+    const radiusScale = parseRadiusScale(entry.radiusScale);
     for (const absPath of resolveRulePaths(entry.path, folders)) {
-      resolved.push({ absPath, engine, backgroundWatermarkSymbol: watermark, root, inner });
+      resolved.push({ absPath, engine, backgroundWatermarkSymbol: watermark, radiusScale, root, inner });
     }
   }
 
@@ -518,6 +779,18 @@ export const WATERMARK_COLOR_ORIGINAL = 'original';
  */
 function readWatermarkSource(raw: unknown): string | undefined {
   return typeof raw === 'string' ? raw.trim() || undefined : undefined;
+}
+
+/**
+ * Read a `backgroundWatermarkSymbol` that may name several drawings. One string is
+ * a list of one; an array keeps its order (which only the seeded pick cares about).
+ * Undefined means "nothing set here", so the next fallback applies.
+ */
+function readWatermarkSources(raw: unknown): string[] | undefined {
+  const list = (Array.isArray(raw) ? raw : [raw])
+    .map(readWatermarkSource)
+    .filter((s): s is string => !!s);
+  return list.length ? list : undefined;
 }
 
 /** Does this `backgroundWatermarkSymbol` name a drawing rather than a character? */

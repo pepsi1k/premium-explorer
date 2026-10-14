@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.3.3",
+  "version": "2.4.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -83,6 +83,18 @@
                 ],
                 "default": "manual",
                 "markdownDescription": "How this path is colored. Defaults to `manual` if omitted. (`default` is still accepted as an old name for `manual`.)"
+              },
+              "radiusScale": {
+                "type": "string",
+                "enum": [
+                  "block",
+                  "row"
+                ],
+                "enumDescriptions": [
+                  "The folder's rendered block reads as one plate: the root row takes the top corners, the last row rendered under it the bottom ones, everything between stays square.",
+                  "Every row rounds its own box, giving a stack of separately rounded bars."
+                ],
+                "markdownDescription": "What this folder's corner radii are rounded around — its whole rendered block (the default) or each row on its own. Overrides `premiumExplorer.radiusScale`."
               },
               "rootBackgroundStyle": {
                 "type": "string",
@@ -191,6 +203,20 @@
                   }
                 ],
                 "markdownDescription": "Multi-stop fill for the repo root row’s background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `rootBackgroundColor`; applies only while `rootBackgroundStyle` is `solid`. `rootBackgroundOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does)."
+              },
+              "rootBackgroundFillScale": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "row",
+                  "block"
+                ],
+                "enumDescriptions": [
+                  "Block for any direction with a vertical component, row for a purely horizontal one — so a diagonal or vertical fill is visible without having to know this key exists.",
+                  "Every row paints the whole fill inside its own ~22px box. The only scale a horizontal fill needs.",
+                  "One fill stretched over the folder's rendered block, each row showing the slice that belongs at its depth."
+                ],
+                "markdownDescription": "How far the multi-stop fill on the repo root row is stretched.\n\nA CSS gradient splits its colour change between the two axes in proportion to the box it fills, and a row is about 300 x 22 px — so inside one row a diagonal has only ~7% of its change left on the vertical axis, which is why `\"diagonal\"` used to look exactly like `\"horizontal\"`, and why `\"vertical\"` repeated its whole fade inside every row. Stretched over a 20-row block a diagonal puts ~60% there and reads as a diagonal.\n\nOnly applies to `#premiumExplorer.rootBackgroundFill#` when it resolves to a gradient; a flat colour has nothing to stretch. While the folder is partly scrolled out the block is the *rendered* extent, so the fill's ends drift."
               },
               "rootBackgroundOpacity": {
                 "type": "number",
@@ -348,9 +374,88 @@
                 "markdownDescription": "Opacity of the pill for the repo root row."
               },
               "rootPillRadius": {
-                "type": "number",
-                "minimum": 0,
-                "markdownDescription": "Corner radius (px) of the pill for the repo root row."
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the pill on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does."
+              },
+              "rootPillPadding": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+              },
+              "rootBackgroundRadius": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the full-row fill on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nApplied as a `border-radius` on the row, which clips **every** background layer at once — fill, edge bar and watermark — so it rounds the whole painted plate. The row's text is never clipped. `#premiumExplorer.radiusScale#` decides whether the rounding is per row or around the folder's block."
+              },
+              "rootEdgeRadius": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the edge bar on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nThe bar is a background *image*, and an image cannot carry a radius of its own, so this rounds the row's **left** corners — exactly the two the bar occupies — and takes whichever of this and `#premiumExplorer.rootBackgroundRadius#` is larger there. An inset *capsule* bar (all four corners, floating clear of the row edges) would need its own element in the row and is deliberately not offered."
               },
               "rootTextStyle": {
                 "type": "string",
@@ -382,6 +487,52 @@
                   }
                 ],
                 "markdownDescription": "Label text color for the repo root row. Empty = leave it to the theme."
+              },
+              "rootMark": {
+                "type": "string",
+                "examples": [
+                  "ansible",
+                  "argo",
+                  "claude",
+                  "docker",
+                  "fluxcd",
+                  "git",
+                  "kubernetes",
+                  "pulumi",
+                  "terraform",
+                  "🐳",
+                  "./.vscode/whale.svg"
+                ],
+                "markdownDescription": "A single fixed glyph stamped just after the label on the repo root row — a per-folder mark, at full size and in its own colours, rather than the faint tiled watermark.\n\n- A **built-in glyph**: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙` (drawn in `markColor`, or the theme foreground).\n- A **path to an `.svg` file**, inline `<svg>` markup, or a `data:image/svg+xml` URI — resolved exactly like `#premiumExplorer.backgroundWatermarkSymbol#`.\n\nIt does **not** compete with Git's status letter: that one lives in VS Code's single file-decoration badge slot, while the mark is painted by the injected CSS, so both show at once. (`#premiumExplorer.badge#` does take that slot, and does hide the letter.) Empty = no mark."
+              },
+              "rootMarkColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Tint for `#premiumExplorer.rootMark#`. Empty keeps an SVG's own colours — which is usually the point of picking a real logo. A character mark needs one, and falls back to the theme foreground."
+              },
+              "rootMarkSize": {
+                "type": "number",
+                "minimum": 4,
+                "markdownDescription": "Size (px) of `#premiumExplorer.rootMark#`. It is square."
+              },
+              "rootMarkGap": {
+                "type": "number",
+                "minimum": 0,
+                "markdownDescription": "Gap (px) between the end of the row's text and `#premiumExplorer.rootMark#`."
+              },
+              "rootMarkInPill": {
+                "type": "boolean",
+                "markdownDescription": "Grow the pill on the repo root row rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
               },
               "innerBackgroundStyle": {
                 "type": "string",
@@ -490,6 +641,20 @@
                   }
                 ],
                 "markdownDescription": "Multi-stop fill for the inner rows’ (files/folders inside) background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `innerBackgroundColor`; applies only while `innerBackgroundStyle` is `solid`. `innerBackgroundOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does)."
+              },
+              "innerBackgroundFillScale": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "row",
+                  "block"
+                ],
+                "enumDescriptions": [
+                  "Block for any direction with a vertical component, row for a purely horizontal one — so a diagonal or vertical fill is visible without having to know this key exists.",
+                  "Every row paints the whole fill inside its own ~22px box. The only scale a horizontal fill needs.",
+                  "One fill stretched over the folder's rendered block, each row showing the slice that belongs at its depth."
+                ],
+                "markdownDescription": "How far the multi-stop fill on the inner rows is stretched.\n\nA CSS gradient splits its colour change between the two axes in proportion to the box it fills, and a row is about 300 x 22 px — so inside one row a diagonal has only ~7% of its change left on the vertical axis, which is why `\"diagonal\"` used to look exactly like `\"horizontal\"`, and why `\"vertical\"` repeated its whole fade inside every row. Stretched over a 20-row block a diagonal puts ~60% there and reads as a diagonal.\n\nOnly applies to `#premiumExplorer.innerBackgroundFill#` when it resolves to a gradient; a flat colour has nothing to stretch. While the folder is partly scrolled out the block is the *rendered* extent, so the fill's ends drift."
               },
               "innerBackgroundOpacity": {
                 "type": "number",
@@ -647,9 +812,88 @@
                 "markdownDescription": "Opacity of the pill for the inner rows (files/folders inside)."
               },
               "innerPillRadius": {
-                "type": "number",
-                "minimum": 0,
-                "markdownDescription": "Corner radius (px) of the pill for the inner rows (files/folders inside)."
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the pill on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does."
+              },
+              "innerPillPadding": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+              },
+              "innerBackgroundRadius": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the full-row fill on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nIgnored while `#premiumExplorer.radiusScale#` is `block`: one plate has one outline, and it comes from `#premiumExplorer.rootBackgroundRadius#`."
+              },
+              "innerEdgeRadius": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "markdownDescription": "Corner radius for the edge bar on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nRounds the row's left corners, like `#premiumExplorer.rootEdgeRadius#`."
               },
               "innerTextStyle": {
                 "type": "string",
@@ -681,6 +925,52 @@
                   }
                 ],
                 "markdownDescription": "Label text color for the inner rows (files/folders inside). Empty = leave it to the theme."
+              },
+              "innerMark": {
+                "type": "string",
+                "examples": [
+                  "ansible",
+                  "argo",
+                  "claude",
+                  "docker",
+                  "fluxcd",
+                  "git",
+                  "kubernetes",
+                  "pulumi",
+                  "terraform",
+                  "🐳",
+                  "./.vscode/whale.svg"
+                ],
+                "markdownDescription": "A single fixed glyph stamped just after the label on the inner rows — a per-folder mark, at full size and in its own colours, rather than the faint tiled watermark.\n\n- A **built-in glyph**: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙` (drawn in `markColor`, or the theme foreground).\n- A **path to an `.svg` file**, inline `<svg>` markup, or a `data:image/svg+xml` URI — resolved exactly like `#premiumExplorer.backgroundWatermarkSymbol#`.\n\nIt does **not** compete with Git's status letter: that one lives in VS Code's single file-decoration badge slot, while the mark is painted by the injected CSS, so both show at once. (`#premiumExplorer.badge#` does take that slot, and does hide the letter.) Empty = no mark."
+              },
+              "innerMarkColor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "markdownDescription": "Tint for `#premiumExplorer.innerMark#`. Empty keeps an SVG's own colours."
+              },
+              "innerMarkSize": {
+                "type": "number",
+                "minimum": 4,
+                "markdownDescription": "Size (px) of `#premiumExplorer.innerMark#`. It is square."
+              },
+              "innerMarkGap": {
+                "type": "number",
+                "minimum": 0,
+                "markdownDescription": "Gap (px) between the end of the row's text and `#premiumExplorer.innerMark#`."
+              },
+              "innerMarkInPill": {
+                "type": "boolean",
+                "markdownDescription": "Grow the pill on the inner rows rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
               },
               "rootEdgeColors": {
                 "type": "array",
@@ -782,6 +1072,22 @@
                   "Only the baked clearing: fewer and fainter copies down the middle of the canvas where names run, full strength out in the margins. Costs nothing at paint time and never touches the row's colour."
                 ],
                 "markdownDescription": "How the watermark on the repo root row gets out of the way of what you are reading."
+              },
+              "rootWatermarkLayout": {
+                "type": "string",
+                "enum": [
+                  "scatter",
+                  "right-edge",
+                  "row",
+                  "corner"
+                ],
+                "enumDescriptions": [
+                  "The jittered field across the whole canvas.",
+                  "The same field squeezed into a band at the right edge, so the glyphs hug the far side and keep clear of the filenames.",
+                  "One horizontal line of glyphs in the canvas's top band, laid out from the right edge.",
+                  "A single oversized glyph hugging the top-right corner, read as a badge. One per canvas; `watermarkDensity`, `watermarkVariation` and `watermarkRotation` have nothing to vary."
+                ],
+                "markdownDescription": "How the watermark copies are arranged on the repo root row's canvas.\n\nWith `row`, the canvas left at its default puts that one line on the folder's root row and nowhere else; setting `watermarkCanvas` to a row's height (22) repeats it once per row instead.\n\nFor *\"every glyph a name reaches drops to ~7%\"*, set `watermarkDimStyle` to `text` and `watermarkDim` to `0.93` — the cover takes back `dim` of each copy's own opacity, so what is left is `1 - dim`."
               },
               "rootWatermarkDim": {
                 "type": "number",
@@ -901,6 +1207,22 @@
                 ],
                 "markdownDescription": "How the watermark on the rows inside a colored folder gets out of the way of what you are reading."
               },
+              "innerWatermarkLayout": {
+                "type": "string",
+                "enum": [
+                  "scatter",
+                  "right-edge",
+                  "row",
+                  "corner"
+                ],
+                "enumDescriptions": [
+                  "The jittered field across the whole canvas.",
+                  "The same field squeezed into a band at the right edge, so the glyphs hug the far side and keep clear of the filenames.",
+                  "One horizontal line of glyphs in the canvas's top band, laid out from the right edge.",
+                  "A single oversized glyph hugging the top-right corner, read as a badge. One per canvas; `watermarkDensity`, `watermarkVariation` and `watermarkRotation` have nothing to vary."
+                ],
+                "markdownDescription": "How the watermark copies are arranged on the inner rows' canvas.\n\nWith `row`, the canvas left at its default puts that one line on the folder's root row and nowhere else; setting `watermarkCanvas` to a row's height (22) repeats it once per row instead.\n\nFor *\"every glyph a name reaches drops to ~7%\"*, set `watermarkDimStyle` to `text` and `watermarkDim` to `0.93` — the cover takes back `dim` of each copy's own opacity, so what is left is `1 - dim`."
+              },
               "innerWatermarkDim": {
                 "type": "number",
                 "minimum": 0,
@@ -951,7 +1273,17 @@
                 "markdownDescription": "0-1 — how much the rows inside a colored folder watermarks vary in size, brightness and position. 0 is a uniform grid; tilt is separate, see `innerWatermarkRotation`."
               },
               "backgroundWatermarkSymbol": {
-                "type": "string",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ],
                 "examples": [
                   "ansible",
                   "argo",
@@ -963,9 +1295,17 @@
                   "pulumi",
                   "terraform",
                   "🐳",
-                  "./.vscode/whale.svg"
+                  "./.vscode/whale.svg",
+                  [
+                    "docker",
+                    "terraform"
+                  ],
+                  [
+                    "✦",
+                    "◇"
+                  ]
                 ],
-                "markdownDescription": "Watermark artwork for this rule's folder, tiled faintly behind the rows. Overrides `premiumExplorer.backgroundWatermarkSymbol`.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work."
+                "markdownDescription": "Watermark artwork for this rule's folder, tiled faintly behind the rows. Overrides `premiumExplorer.backgroundWatermarkSymbol`.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work.\n\nA **list** mixes drawings: every copy on the canvas picks one, seeded off the folder so the mix is stable (`[\"docker\", \"terraform\"]`, or `[\"✦\", \"◇\"]`)."
               },
               "backgroundWatermark": {
                 "type": "string",
@@ -1116,6 +1456,21 @@
             }
           ],
           "markdownDescription": "Multi-stop fill for the repo root row’s background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.rootBackgroundColor#`; applies only while `#premiumExplorer.rootBackgroundStyle#` is `solid`. `#premiumExplorer.rootBackgroundOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does). Edited in settings.json (objects have no Settings-UI editor)."
+        },
+        "premiumExplorer.rootBackgroundFillScale": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "row",
+            "block"
+          ],
+          "enumDescriptions": [
+            "Block for any direction with a vertical component, row for a purely horizontal one — so a diagonal or vertical fill is visible without having to know this key exists.",
+            "Every row paints the whole fill inside its own ~22px box. The only scale a horizontal fill needs.",
+            "One fill stretched over the folder's rendered block, each row showing the slice that belongs at its depth."
+          ],
+          "default": "auto",
+          "markdownDescription": "How far the multi-stop fill on the repo root row is stretched.\n\nA CSS gradient splits its colour change between the two axes in proportion to the box it fills, and a row is about 300 x 22 px — so inside one row a diagonal has only ~7% of its change left on the vertical axis, which is why `\"diagonal\"` used to look exactly like `\"horizontal\"`, and why `\"vertical\"` repeated its whole fade inside every row. Stretched over a 20-row block a diagonal puts ~60% there and reads as a diagonal.\n\nOnly applies to `#premiumExplorer.rootBackgroundFill#` when it resolves to a gradient; a flat colour has nothing to stretch. While the folder is partly scrolled out the block is the *rendered* extent, so the fill's ends drift."
         },
         "premiumExplorer.rootBackgroundOpacity": {
           "type": "number",
@@ -1280,10 +1635,92 @@
           "markdownDescription": "Opacity of the pill for the repo root row."
         },
         "premiumExplorer.rootPillRadius": {
-          "type": "number",
-          "minimum": 0,
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
           "default": 6,
-          "markdownDescription": "Corner radius (px) of the pill for the repo root row."
+          "markdownDescription": "Corner radius for the pill on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does."
+        },
+        "premiumExplorer.rootPillPadding": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 5,
+          "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+        },
+        "premiumExplorer.rootBackgroundRadius": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 0,
+          "markdownDescription": "Corner radius for the full-row fill on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nApplied as a `border-radius` on the row, which clips **every** background layer at once — fill, edge bar and watermark — so it rounds the whole painted plate. The row's text is never clipped. `#premiumExplorer.radiusScale#` decides whether the rounding is per row or around the folder's block."
+        },
+        "premiumExplorer.rootEdgeRadius": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 0,
+          "markdownDescription": "Corner radius for the edge bar on the repo root row. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nThe bar is a background *image*, and an image cannot carry a radius of its own, so this rounds the row's **left** corners — exactly the two the bar occupies — and takes whichever of this and `#premiumExplorer.rootBackgroundRadius#` is larger there. An inset *capsule* bar (all four corners, floating clear of the row edges) would need its own element in the row and is deliberately not offered."
         },
         "premiumExplorer.rootTextStyle": {
           "type": "string",
@@ -1317,6 +1754,55 @@
           ],
           "default": "",
           "markdownDescription": "Label text color for the repo root row. Empty = leave it to the theme."
+        },
+        "premiumExplorer.rootMark": {
+          "type": "string",
+          "examples": [
+            "ansible",
+            "argo",
+            "claude",
+            "docker",
+            "fluxcd",
+            "git",
+            "kubernetes",
+            "pulumi",
+            "terraform",
+            "🐳",
+            "./.vscode/whale.svg"
+          ],
+          "markdownDescription": "A single fixed glyph stamped just after the label on the repo root row — a per-folder mark, at full size and in its own colours, rather than the faint tiled watermark.\n\n- A **built-in glyph**: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙` (drawn in `markColor`, or the theme foreground).\n- A **path to an `.svg` file**, inline `<svg>` markup, or a `data:image/svg+xml` URI — resolved exactly like `#premiumExplorer.backgroundWatermarkSymbol#`.\n\nIt does **not** compete with Git's status letter: that one lives in VS Code's single file-decoration badge slot, while the mark is painted by the injected CSS, so both show at once. (`#premiumExplorer.badge#` does take that slot, and does hide the letter.) Empty = no mark."
+        },
+        "premiumExplorer.rootMarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "markdownDescription": "Tint for `#premiumExplorer.rootMark#`. Empty keeps an SVG's own colours — which is usually the point of picking a real logo. A character mark needs one, and falls back to the theme foreground."
+        },
+        "premiumExplorer.rootMarkSize": {
+          "type": "number",
+          "minimum": 4,
+          "default": 14,
+          "markdownDescription": "Size (px) of `#premiumExplorer.rootMark#`. It is square."
+        },
+        "premiumExplorer.rootMarkGap": {
+          "type": "number",
+          "minimum": 0,
+          "default": 6,
+          "markdownDescription": "Gap (px) between the end of the row's text and `#premiumExplorer.rootMark#`."
+        },
+        "premiumExplorer.rootMarkInPill": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Grow the pill on the repo root row rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
         },
         "premiumExplorer.rootEdgeColors": {
           "type": "array",
@@ -1427,6 +1913,23 @@
           ],
           "markdownDescription": "How the watermark on the repo root row gets out of the way of what you are reading.",
           "default": "smart"
+        },
+        "premiumExplorer.rootWatermarkLayout": {
+          "type": "string",
+          "enum": [
+            "scatter",
+            "right-edge",
+            "row",
+            "corner"
+          ],
+          "enumDescriptions": [
+            "The jittered field across the whole canvas.",
+            "The same field squeezed into a band at the right edge, so the glyphs hug the far side and keep clear of the filenames.",
+            "One horizontal line of glyphs in the canvas's top band, laid out from the right edge.",
+            "A single oversized glyph hugging the top-right corner, read as a badge. One per canvas; `watermarkDensity`, `watermarkVariation` and `watermarkRotation` have nothing to vary."
+          ],
+          "default": "scatter",
+          "markdownDescription": "How the watermark copies are arranged on the repo root row's canvas.\n\nWith `row`, the canvas left at its default puts that one line on the folder's root row and nowhere else; setting `watermarkCanvas` to a row's height (22) repeats it once per row instead.\n\nFor *\"every glyph a name reaches drops to ~7%\"*, set `watermarkDimStyle` to `text` and `watermarkDim` to `0.93` — the cover takes back `dim` of each copy's own opacity, so what is left is `1 - dim`."
         },
         "premiumExplorer.rootWatermarkDim": {
           "type": "number",
@@ -1557,6 +2060,21 @@
             }
           ],
           "markdownDescription": "Multi-stop fill for the inner rows’ (files/folders inside) background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.innerBackgroundColor#`; applies only while `#premiumExplorer.innerBackgroundStyle#` is `solid`. `#premiumExplorer.innerBackgroundOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does). Edited in settings.json (objects have no Settings-UI editor)."
+        },
+        "premiumExplorer.innerBackgroundFillScale": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "row",
+            "block"
+          ],
+          "enumDescriptions": [
+            "Block for any direction with a vertical component, row for a purely horizontal one — so a diagonal or vertical fill is visible without having to know this key exists.",
+            "Every row paints the whole fill inside its own ~22px box. The only scale a horizontal fill needs.",
+            "One fill stretched over the folder's rendered block, each row showing the slice that belongs at its depth."
+          ],
+          "default": "auto",
+          "markdownDescription": "How far the multi-stop fill on the inner rows is stretched.\n\nA CSS gradient splits its colour change between the two axes in proportion to the box it fills, and a row is about 300 x 22 px — so inside one row a diagonal has only ~7% of its change left on the vertical axis, which is why `\"diagonal\"` used to look exactly like `\"horizontal\"`, and why `\"vertical\"` repeated its whole fade inside every row. Stretched over a 20-row block a diagonal puts ~60% there and reads as a diagonal.\n\nOnly applies to `#premiumExplorer.innerBackgroundFill#` when it resolves to a gradient; a flat colour has nothing to stretch. While the folder is partly scrolled out the block is the *rendered* extent, so the fill's ends drift."
         },
         "premiumExplorer.innerBackgroundOpacity": {
           "type": "number",
@@ -1721,10 +2239,92 @@
           "markdownDescription": "Opacity of the pill for the inner rows (files/folders inside)."
         },
         "premiumExplorer.innerPillRadius": {
-          "type": "number",
-          "minimum": 0,
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
           "default": 3,
-          "markdownDescription": "Corner radius (px) of the pill for the inner rows (files/folders inside)."
+          "markdownDescription": "Corner radius for the pill on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does."
+        },
+        "premiumExplorer.innerPillPadding": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 5,
+          "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+        },
+        "premiumExplorer.innerBackgroundRadius": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 0,
+          "markdownDescription": "Corner radius for the full-row fill on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nIgnored while `#premiumExplorer.radiusScale#` is `block`: one plate has one outline, and it comes from `#premiumExplorer.rootBackgroundRadius#`."
+        },
+        "premiumExplorer.innerEdgeRadius": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 0,
+          "markdownDescription": "Corner radius for the edge bar on the inner rows. A number rounds all four corners; the per-corner form takes the CSS order *top-left, top-right, bottom-right, bottom-left*, as a short array (`[6, 6, 0, 0]`) or a string (`\"6 6 0 0\"`), filling in fewer entries exactly as the CSS `border-radius` shorthand does.\n\nRounds the row's left corners, like `#premiumExplorer.rootEdgeRadius#`."
         },
         "premiumExplorer.innerTextStyle": {
           "type": "string",
@@ -1758,6 +2358,55 @@
           ],
           "default": "",
           "markdownDescription": "Label text color for the inner rows (files/folders inside). Empty = leave it to the theme."
+        },
+        "premiumExplorer.innerMark": {
+          "type": "string",
+          "examples": [
+            "ansible",
+            "argo",
+            "claude",
+            "docker",
+            "fluxcd",
+            "git",
+            "kubernetes",
+            "pulumi",
+            "terraform",
+            "🐳",
+            "./.vscode/whale.svg"
+          ],
+          "markdownDescription": "A single fixed glyph stamped just after the label on the inner rows — a per-folder mark, at full size and in its own colours, rather than the faint tiled watermark.\n\n- A **built-in glyph**: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙` (drawn in `markColor`, or the theme foreground).\n- A **path to an `.svg` file**, inline `<svg>` markup, or a `data:image/svg+xml` URI — resolved exactly like `#premiumExplorer.backgroundWatermarkSymbol#`.\n\nIt does **not** compete with Git's status letter: that one lives in VS Code's single file-decoration badge slot, while the mark is painted by the injected CSS, so both show at once. (`#premiumExplorer.badge#` does take that slot, and does hide the letter.) Empty = no mark."
+        },
+        "premiumExplorer.innerMarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "markdownDescription": "Tint for `#premiumExplorer.innerMark#`. Empty keeps an SVG's own colours."
+        },
+        "premiumExplorer.innerMarkSize": {
+          "type": "number",
+          "minimum": 4,
+          "default": 14,
+          "markdownDescription": "Size (px) of `#premiumExplorer.innerMark#`. It is square."
+        },
+        "premiumExplorer.innerMarkGap": {
+          "type": "number",
+          "minimum": 0,
+          "default": 6,
+          "markdownDescription": "Gap (px) between the end of the row's text and `#premiumExplorer.innerMark#`."
+        },
+        "premiumExplorer.innerMarkInPill": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Grow the pill on the inner rows rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
         },
         "premiumExplorer.innerEdgeColors": {
           "type": "array",
@@ -1869,6 +2518,23 @@
           "markdownDescription": "How the watermark on the rows inside a colored folder gets out of the way of what you are reading.",
           "default": "smart"
         },
+        "premiumExplorer.innerWatermarkLayout": {
+          "type": "string",
+          "enum": [
+            "scatter",
+            "right-edge",
+            "row",
+            "corner"
+          ],
+          "enumDescriptions": [
+            "The jittered field across the whole canvas.",
+            "The same field squeezed into a band at the right edge, so the glyphs hug the far side and keep clear of the filenames.",
+            "One horizontal line of glyphs in the canvas's top band, laid out from the right edge.",
+            "A single oversized glyph hugging the top-right corner, read as a badge. One per canvas; `watermarkDensity`, `watermarkVariation` and `watermarkRotation` have nothing to vary."
+          ],
+          "default": "scatter",
+          "markdownDescription": "How the watermark copies are arranged on the inner rows' canvas.\n\nWith `row`, the canvas left at its default puts that one line on the folder's root row and nowhere else; setting `watermarkCanvas` to a row's height (22) repeats it once per row instead.\n\nFor *\"every glyph a name reaches drops to ~7%\"*, set `watermarkDimStyle` to `text` and `watermarkDim` to `0.93` — the cover takes back `dim` of each copy's own opacity, so what is left is `1 - dim`."
+        },
         "premiumExplorer.innerWatermarkDim": {
           "type": "number",
           "minimum": 0,
@@ -1942,6 +2608,506 @@
           ],
           "default": "none",
           "markdownDescription": "How a folder that is **itself a symlink** is painted when a rule names its path. Symlinks are otherwise never colored: a `git` rule does not descend into them while discovering repositories, so a repo is not found — and colored — twice under two different paths. A symlink *inside* a colored folder is still painted like any other row in that folder, and is not covered by this setting."
+        },
+        "premiumExplorer.gitMarkStyle": {
+          "type": "string",
+          "enum": [
+            "chip",
+            "bare",
+            "outline",
+            "solid",
+            "none"
+          ],
+          "enumDescriptions": [
+            "The filename, the status letter and the folder dot are lifted clear of the row, and the letter gets a plate stepped off the row's ground with a border in Git's own colour. Applied only where a background actually paints.",
+            "Exactly what VS Code does — the status colour untouched, whatever is under it.",
+            "The lift, with a border in the lifted hue and no plate.",
+            "The status colour becomes the letter’s plate, with the letter knocked out of it.",
+            "Hide the status letter and the folder dot; the filename still lifts."
+          ],
+          "default": "chip",
+          "markdownDescription": "How Git's status marks are kept readable once Premium Explorer paints a background under them.\n\nVS Code picks the status colour against the *theme's* background, so over a fill it can fall a long way short of readable — measured over an amber fill: modified 3.4:1, added 2.5:1, deleted 1.3:1, against a 4.5:1 target. `chip` fixes that by lifting each mark against the colour the row actually shows, and putting the letter on a plate stepped off that same ground with a border at Git's own hex.\n\n`chip` applies to **every row of a coloured folder**, including the ones that paint no fill of their own: with `innerBackgroundStyle: none` the children sit on the theme's own ground, where three of Git's four hexes already pass and the lift is simply a no-op — but deleted still fails at 3.3:1 and is lifted even there. A row outside every coloured folder keeps exactly what VS Code painted; `bare` opts out everywhere.\n\n**Selection outranks Git.** On a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, because the plate and the border still carry which status it is — and the chip inverts to dark-on-light so the letter stays legible on a bright selection."
+        },
+        "premiumExplorer.gitMarkContrast": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 21,
+          "default": 4.5,
+          "markdownDescription": "The WCAG contrast ratio an `auto` git-mark colour is lifted to, against the colour the row actually shows. 4.5:1 is the WCAG AA threshold for body text; 3:1 is the large-text threshold. A lift stops as soon as it reaches the target, so the mark keeps as much of its status colour as the target allows — and if the target is unreachable (a mid grey has no colour at 4.5:1) the mark lands as close as it can rather than vanishing."
+        },
+        "premiumExplorer.gitLabelColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "modified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a modified file."
+                },
+                "added": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a added file."
+                },
+                "untracked": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a untracked file."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a deleted file."
+                }
+              }
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The **filename** of a file Git has decorated.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n**Selection outranks this entirely**: on a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, since the chip's plate and border still carry which status it is."
+        },
+        "premiumExplorer.gitMarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "modified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a modified file."
+                },
+                "added": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a added file."
+                },
+                "untracked": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a untracked file."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a deleted file."
+                }
+              }
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The **status letter**'s ink (`M`, `A`, `U`, `D`).\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status."
+        },
+        "premiumExplorer.gitMarkBackgroundColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "modified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a modified file."
+                },
+                "added": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a added file."
+                },
+                "untracked": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a untracked file."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a deleted file."
+                }
+              }
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The **plate** behind the status letter, under `gitMarkStyle: chip` or `solid`.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` means the row's own ground stepped off itself for `chip`, and the status colour lifted until a knockout letter reads out of it for `solid`."
+        },
+        "premiumExplorer.gitMarkBorderColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "modified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a modified file."
+                },
+                "added": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a added file."
+                },
+                "untracked": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a untracked file."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a deleted file."
+                }
+              }
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The status letter's **border**.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` keeps Git's own hex for `chip` — the plate says *a mark*, the border says *which* mark — and takes the lifted hue for `outline`."
+        },
+        "premiumExplorer.gitFolderDotColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "modified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a modified file."
+                },
+                "added": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a added file."
+                },
+                "untracked": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a untracked file."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ],
+                  "description": "Colour for a deleted file."
+                }
+              }
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The **dot** on a folder that contains changes.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\nVS Code draws it at 40% opacity, which would undo any lift, so a row we take over shows it at full strength with a halo in the plate colour."
+        },
+        "premiumExplorer.symlinkMark": {
+          "type": "string",
+          "examples": [
+            "⤷",
+            "↗",
+            "git"
+          ],
+          "markdownDescription": "An **extra** mark Premium Explorer stamps beside the label of a folder that is itself a symlink and that one of your rules names by path. Empty (the default) = none, which is usually right: VS Code already marks a symlink with a `⤷` in the file-decoration badge, and `#premiumExplorer.symlinkMarkColor#` colours that one.\n\nSet this only where the native arrow cannot be seen — VS Code drops it on a **compressed** row (`linked/nested` collapsed into one), and `#premiumExplorer.badge#` hides it by taking the badge slot. Setting it otherwise gives the row two arrows.\n\nIt takes the same sources as `#premiumExplorer.rootMark#` and needs `#premiumExplorer.symlinkFolders#` to be something other than `none`, or the folder is never painted at all."
+        },
+        "premiumExplorer.symlinkMarkColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "auto",
+                "off"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "color-hex"
+            }
+          ],
+          "default": "auto",
+          "markdownDescription": "The colour of the **symlink arrow** VS Code appends to a symlinked row's file-decoration badge (`⤷`).\n\n- `auto` — the tree's own icon foreground, i.e. the chevron ink.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted.\n\nOn a **selected** row it swaps for `#premiumExplorer.selectedTextColor#`, exactly as the Git letter does.\n\n**It only applies where the arrow is the whole badge.** Beside a Git status letter the two arrive as one string (`U, ⤷`) in one `::after` with one colour, so there is nothing to colour separately and `#premiumExplorer.gitMarkStyle#` governs both — which is also what plates them together into one chip."
+        },
+        "premiumExplorer.radiusScale": {
+          "type": "string",
+          "enum": [
+            "block",
+            "row"
+          ],
+          "enumDescriptions": [
+            "The folder's rendered block reads as one plate: the root row takes the top corners, the last row rendered under it the bottom ones, everything between stays square.",
+            "Every row rounds its own box, giving a stack of separately rounded bars."
+          ],
+          "default": "block",
+          "markdownDescription": "What a corner radius is rounded **around**. Inert until one of the `*BackgroundRadius` / `*EdgeRadius` keys is actually set.\n\nA coloured folder spans many rows, so rounding each one gives a stack of separate rounded bars; rounding the block is what reads as one plate. While a folder's end is scrolled out of view the bottom corners are left square rather than drawing a false end mid-folder."
         },
         "premiumExplorer.badge": {
           "type": "string",
@@ -2139,8 +3305,33 @@
           "maximum": 1,
           "markdownDescription": "How much darker the selected row becomes when the Explorer is **not** focused (0 = same color, 1 = black). The border is also dropped while unfocused, mirroring VS Code’s inactive selection."
         },
-        "premiumExplorer.backgroundWatermarkSymbol": {
+        "premiumExplorer.selectedRenameStyle": {
           "type": "string",
+          "enum": [
+            "dim",
+            "field",
+            "edge"
+          ],
+          "enumDescriptions": [
+            "The box gets out of the way: transparent field, the row's own fill and watermark carrying through, a border marking where the typing goes.",
+            "The box shows as a real inset text field in the theme's own input colours, over the shifted row.",
+            "`dim`, plus the edge bar switches to the theme focus accent for as long as the box is open."
+          ],
+          "default": "dim",
+          "markdownDescription": "How a row looks while its inline **rename** box is open, on top of the step the row itself takes off its usual colour.\n\n`edge` is the one exception to the rule that the edge bar always keeps its own colours: it is opt-in, it lasts only while a rename is actually open, and renaming is the one state where saying *where the typing is* outranks saying which folder the row belongs to."
+        },
+        "premiumExplorer.backgroundWatermarkSymbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
           "default": "",
           "examples": [
             "ansible",
@@ -2153,9 +3344,17 @@
             "pulumi",
             "terraform",
             "🐳",
-            "./.vscode/whale.svg"
+            "./.vscode/whale.svg",
+            [
+              "docker",
+              "terraform"
+            ],
+            [
+              "✦",
+              "◇"
+            ]
           ],
-          "markdownDescription": "Default watermark artwork for every colored folder, tiled faintly behind the rows.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`. Only the first two characters are drawn, so a longer word that is not a glyph name is almost certainly a typo.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work.\n\nEmpty = each folder uses the first letter of its own name. Whether it is *drawn* is up to `#premiumExplorer.rootWatermarkStyle#` / `#premiumExplorer.innerWatermarkStyle#`."
+          "markdownDescription": "Default watermark artwork for every colored folder, tiled faintly behind the rows.\n\n- A **built-in glyph** shipped with the extension: `ansible`, `argo`, `claude`, `docker`, `fluxcd`, `git`, `kubernetes`, `pulumi`, `terraform`.\n- A **character or emoji**: `🐳`, `⚙`. Only the first two characters are drawn, so a longer word that is not a glyph name is almost certainly a typo.\n- A **path to an `.svg` file**: `./.vscode/whale.svg`, `~/icons/aws.svg`. Relative paths resolve against the folder itself, then each workspace root, and a readable file wins over a built-in glyph of the same name. Inline `<svg>` markup and `data:image/svg+xml` URIs also work.\n\nEmpty = each folder uses the first letter of its own name. Whether it is *drawn* is up to `#premiumExplorer.rootWatermarkStyle#` / `#premiumExplorer.innerWatermarkStyle#`.\n\nA **list** mixes drawings: every copy on the canvas picks one, seeded off the folder so the mix is stable (`[\"docker\", \"terraform\"]`, or `[\"✦\", \"◇\"]`)."
         },
         "premiumExplorer.backgroundWatermark": {
           "type": "string",
@@ -2267,6 +3466,21 @@
           "minimum": 8,
           "markdownDescription": "The height in px of the clearing on the rows inside a colored folder — how far apart its points sit down the canvas. Capped at `#premiumExplorer.innerWatermarkCanvas#`, and the shape tapers to a point at top and bottom so it tiles seamlessly.",
           "default": 560
+        },
+        "premiumExplorer.symlinkMarkTint": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "string",
+              "enum": [
+                ""
+              ]
+            }
+          ],
+          "markdownDescription": "Tint for `#premiumExplorer.symlinkMark#`, the mark Premium Explorer stamps itself. Empty keeps an SVG's own colours; a character mark falls back to the theme foreground. This is a different thing from `#premiumExplorer.symlinkMarkColor#`, which colours VS Code's own arrow in the badge."
         }
       }
     }

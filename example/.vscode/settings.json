@@ -1,9 +1,13 @@
 {
   "premiumExplorer.enabled": true,
-  "premiumExplorer.symlinkFolders": "none",
+  "premiumExplorer.symlinkFolders": "dim",
+  "premiumExplorer.symlinkMarkColor": "auto",
+  "premiumExplorer.gitMarkStyle": "chip",
+  "premiumExplorer.gitMarkContrast": 4.5,
   "premiumExplorer.selectedBackgroundColor": "#ffffff",
   "premiumExplorer.selectedTextColor": "#0d1330",
   "premiumExplorer.selectedOpacity": 1,
+  "premiumExplorer.selectedRenameStyle": "edge",
   "premiumExplorer.rules": [
     {
       "path": "./backgrounds/01-solid",
@@ -432,6 +436,275 @@
       "innerBackgroundOpacity": 0.14
     },
 
+    {
+      "path": "./at-scale/diagonal-block",
+      "rootBackgroundFill": {
+        "stops": [
+          "#e6194b",
+          "#4363d8"
+        ],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "rootBackgroundFillScale": "block",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": [
+          "#e6194b",
+          "#4363d8"
+        ],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "innerBackgroundFillScale": "block",
+      "innerBackgroundOpacity": 0.3
+    },
+    {
+      "path": "./at-scale/diagonal-row",
+      "rootBackgroundFill": {
+        "stops": [
+          "#e6194b",
+          "#4363d8"
+        ],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "rootBackgroundFillScale": "row",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": [
+          "#e6194b",
+          "#4363d8"
+        ],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "innerBackgroundFillScale": "row",
+      "innerBackgroundOpacity": 0.3
+    },
+    {
+      "path": "./at-scale/vertical-block",
+      "rootBackgroundFill": {
+        "stops": [
+          "#2a9d8f",
+          "#911eb4"
+        ],
+        "direction": "vertical"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": [
+          "#2a9d8f",
+          "#911eb4"
+        ],
+        "direction": "vertical"
+      },
+      "innerBackgroundOpacity": 0.3
+    },
+    {
+      "path": "./radius/block-plate",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.55,
+      "rootBackgroundRadius": 8,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./radius/per-row",
+      "radiusScale": "row",
+      "rootBackgroundColor": "#f58231",
+      "rootBackgroundOpacity": 0.55,
+      "rootBackgroundRadius": [
+        6,
+        6,
+        0,
+        0
+      ],
+      "innerBackgroundColor": "#f58231",
+      "innerBackgroundOpacity": 0.14,
+      "innerBackgroundRadius": "4 4 4 4"
+    },
+    {
+      "path": "./radius/edge-capsule",
+      "rootEdge": "solid",
+      "rootEdgeColors": [
+        "#f032e6",
+        "#c99700"
+      ],
+      "rootEdgeWidth": 5,
+      "rootEdgeRadius": 3,
+      "innerEdge": "solid",
+      "innerEdgeColors": [
+        "#f032e6",
+        "#c99700"
+      ],
+      "innerEdgeWidth": 5,
+      "innerEdgeRadius": 3
+    },
+    {
+      "path": "./radius/edge-capsule/src",
+      "rootEdge": "inherit"
+    },
+    {
+      "path": "./radius/pill-corners",
+      "rootPill": "solid",
+      "rootPillColor": "#7f4fc9",
+      "rootPillRadius": [
+        9,
+        9,
+        0,
+        0
+      ],
+      "innerPill": "solid",
+      "innerPillColor": "#7f4fc9",
+      "innerPillOpacity": 0.5,
+      "innerPillRadius": "0 6"
+    },
+    {
+      "path": "./marks/icon",
+      "rootBackgroundColor": "#1f9e89",
+      "rootBackgroundOpacity": 0.45,
+      "rootMark": "docker",
+      "rootMarkSize": 13,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./marks/character",
+      "rootBackgroundColor": "#c99700",
+      "rootBackgroundOpacity": 0.45,
+      "rootMark": "\u2605",
+      "rootMarkColor": "#ffe08a",
+      "rootMarkSize": 11,
+      "rootMarkGap": 8,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./marks/inner-mark",
+      "rootBackgroundColor": "#5d8aa8",
+      "rootBackgroundOpacity": 0.45,
+      "rootMark": "terraform",
+      "innerBackgroundColor": "#5d8aa8",
+      "innerBackgroundOpacity": 0.14,
+      "innerMark": "git",
+      "innerMarkSize": 10
+    },
+    {
+      "path": "./watermark-layouts/right-edge",
+      "rootBackgroundColor": "#4363d8",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "rootWatermarkLayout": "right-edge",
+      "rootWatermarkCanvas": 256,
+      "rootWatermarkSize": 18,
+      "backgroundWatermarkSymbol": "kubernetes",
+      "innerBackgroundStyle": "inherit",
+      "innerWatermarkStyle": "inherit"
+    },
+    {
+      "path": "./watermark-layouts/one-row",
+      "rootBackgroundColor": "#911eb4",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "rootWatermarkLayout": "row",
+      "rootWatermarkSize": 11,
+      "rootWatermarkVariation": 0,
+      "rootWatermarkRotation": 0,
+      "rootWatermarkOpacity": 0.35,
+      "backgroundWatermarkSymbol": "argo",
+      "innerWatermarkStyle": "none",
+      "innerBackgroundStyle": "inherit"
+    },
+    {
+      "path": "./watermark-layouts/corner",
+      "rootBackgroundColor": "#008080",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "rootWatermarkLayout": "corner",
+      "rootWatermarkSize": 150,
+      "rootWatermarkCanvas": 220,
+      "rootWatermarkOpacity": 0.2,
+      "backgroundWatermarkSymbol": "pulumi",
+      "innerBackgroundStyle": "inherit",
+      "innerWatermarkStyle": "inherit"
+    },
+    {
+      "path": "./watermark-layouts/mixed-glyphs",
+      "rootBackgroundColor": "#9a6324",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "backgroundWatermarkSymbol": [
+        "docker",
+        "terraform",
+        "git"
+      ],
+      "innerBackgroundStyle": "inherit",
+      "innerWatermarkStyle": "inherit"
+    },
+    {
+      "path": "./watermark-layouts/dense",
+      "rootBackgroundColor": "#d62728",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "rootWatermarkSize": 10,
+      "rootWatermarkDensity": 16,
+      "rootWatermarkCanvas": 256,
+      "backgroundWatermarkSymbol": [
+        "\u2726",
+        "\u25c7"
+      ],
+      "innerBackgroundStyle": "inherit",
+      "innerWatermarkStyle": "inherit"
+    },
+    {
+      "path": "./watermark-layouts/full-dim",
+      "rootBackgroundColor": "#808000",
+      "rootBackgroundOpacity": 0.45,
+      "rootWatermarkStyle": "solid",
+      "rootWatermarkDimStyle": "text",
+      "rootWatermarkDim": 0.93,
+      "rootWatermarkCanvas": 256,
+      "rootWatermarkSize": 16,
+      "backgroundWatermarkSymbol": "fluxcd",
+      "innerBackgroundStyle": "inherit",
+      "innerWatermarkStyle": "inherit"
+    },
+    {
+      "path": "./pills/padded",
+      "rootPill": "solid",
+      "rootPillColor": "#2a9d8f",
+      "rootPillPadding": [
+        2,
+        10
+      ],
+      "rootPillRadius": 9,
+      "innerPill": "solid",
+      "innerPillColor": "#2a9d8f",
+      "innerPillOpacity": 0.5,
+      "innerPillPadding": 1
+    },
+    {
+      "path": "./marks/in-pill",
+      "rootPill": "solid",
+      "rootPillColor": "#4363d8",
+      "rootPillRadius": 9,
+      "rootMark": "claude",
+      "rootMarkSize": 12,
+      "rootMarkInPill": true,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./symlink/linked",
+      "rootBackgroundColor": "#2a9d8f",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundColor": "#2a9d8f",
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./symlink/target",
+      "rootBackgroundColor": "#c99700",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundStyle": "none"
+    },
     {
       "path": "./regression/bare-rule"
     },

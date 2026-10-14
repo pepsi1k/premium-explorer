@@ -9,7 +9,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ColoredFolder } from './layers';
-import { FolderColorerConfig } from './config';
+import { FolderColorerConfig, GitMarkConfig } from './config';
 import { FolderColors, isWithin } from './coloredFolders';
 import { Fill, mixHex, resolveFill, splitHexAlpha } from './colors';
 
@@ -50,13 +50,24 @@ export interface SelectionFill {
   inactiveGround: string;
 }
 
-/** One workspace's selection settings, as the painter reads them. */
+/**
+ * One workspace's painter options: the selection settings, and everything else
+ * this window decided that is not one folder's colours. Per-workspace for the
+ * same reason the colours are — one global file, many windows (see
+ * {@link mergeWorkspaceSelection}).
+ */
 export interface SelectionOptions {
   bg: string; shift: number; text: string; opacity: number; border: string;
   inactiveDarken: number; overrides: string[]; watermark: string;
-  watermarkContrast: number; bold: boolean;
+  watermarkContrast: number; bold: boolean; renameStyle: string;
   /** Set only when `selectedBackgroundFill` is configured; wins over `bg`. */
   fill?: SelectionFill;
+  /**
+   * The `git*` settings, passed through untouched: every one of their `"auto"`
+   * values is derived in the painter, off the colour the row actually composites
+   * to, so nothing here can be baked (docs/fill-spec.md §4).
+   */
+  git: GitMarkConfig;
 }
 
 /** Every stop stepped toward black — the unfocused variant of a selection fill. */
@@ -172,6 +183,8 @@ export function buildSelection(config: FolderColorerConfig): SelectionOptions {
     watermark: s.watermark,
     watermarkContrast: s.watermarkContrast,
     bold: s.bold,
+    renameStyle: s.renameStyle,
+    git: config.git,
     ...(s.fill !== undefined ? { fill: bakeSelectionFill(s.fill, s.opacity, s.inactiveDarken) } : {}),
   };
 }

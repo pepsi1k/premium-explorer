@@ -87,16 +87,27 @@ legacy key keeps working untouched.
   property can only swap a color, and swapping the whole image stack per hover
   would reintroduce the EM-85 repaint cost — a gradient row fill keeps its
   resting look under the cursor.
-- **At-scale fills (§2 item 4, EM-92)** are the one deliberate bend of "bake at
-  generate time; the painter only picks": the bake ships the resolved gradient
-  string, and the painter sizes it over the folder's block the same way the
-  watermark is block-anchored today (fixed `background-size` = the folder
-  block's rendered extent, `background-position` offsetting each row's slice).
-  The folder's total height is only known in the browser. When the folder is
-  partially scrolled out, the gradient spans the rendered extent the walk can
-  see — the ends drift, which is accepted and documented. Linear only; radial/
-  conic would need per-row 2-D repositioning of one shared image and are out
-  of scope until someone asks.
+- **At-scale fills (§2 item 4, EM-92)** — *shipped*, and the one deliberate bend
+  of "bake at generate time; the painter only picks": the bake ships the resolved
+  gradient string plus `Layer.scale: "block"`, and the painter sizes it over the
+  folder's block the same way the watermark is block-anchored (fixed
+  `background-size: 100% <block>px`, `background-position` offsetting each row's
+  slice). The folder's total height is only known in the browser. When the folder
+  is partially scrolled out, the gradient spans the rendered extent the walk can
+  see — the ends drift, which is accepted. Linear only; radial/conic would need
+  per-row 2-D repositioning of one shared image and are out of scope until
+  someone asks.
+
+  The key is `rootBackgroundFillScale` / `innerBackgroundFillScale`
+  (`auto | row | block`), per-rule overridable. **`auto` is the default and
+  resolves to `block` for any direction with a vertical component**, `row` for a
+  purely horizontal one (90°/270°). That default is the fix for EM-104, not a
+  convenience: a 300x22 row leaves a 135° diagonal ~7% of its colour change on
+  the vertical axis, so per-row it is indistinguishable from `horizontal` — the
+  reported bug. A horizontal fill reads identically at either scale, so nothing
+  that already looked right changes.
+
+  A **selection** fill is always per-row: it marks one row, not a folder's plate.
 
 ## 3. The ground rule (derive-from-fill)
 

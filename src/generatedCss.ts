@@ -99,7 +99,57 @@ export function buildCss(): string {
     `${row}.fc-sel-text.fc-pill-own .label-name *`,
   ].join(',\n');
 
-  return header + editCss + hoverCss +
+  // Git's status marks (EM-96). VS Code renders the status *letter* and the folder
+  // *dot* as `::after` content on `.monaco-icon-label`, coloured by a class whose
+  // name is a runtime hash — so neither can be styled inline, and no stylesheet can
+  // name the hash. What it can name is the two stable classes VS Code puts beside
+  // it: `.monaco-decoration-text-badge` is the letter (a file), and a
+  // `.monaco-decoration-badge` without it is the dot (a folder). The painter decides
+  // per row and publishes the colours as custom properties, exactly like
+  // `--fc-sel-fg`, so one stylesheet still serves every window.
+  //
+  // `!important` on the colours because VS Code's own `::after` rule sets `color`;
+  // the plate and border are ours alone and need no weight. `box-sizing` keeps the
+  // border from growing the letter, and the padding is the chip's whole geometry —
+  // VS Code's own `margin: 0 8px 0 5px` is left alone so the row's layout holds.
+  const gitRow = 'body.fc-active .explorer-folders-view .monaco-list-row';
+  const letter = (marker: string): string =>
+    `${gitRow}${marker} .monaco-icon-label.monaco-decoration-text-badge::after`;
+  const dot = (marker: string): string =>
+    `${gitRow}${marker} .monaco-icon-label.monaco-decoration-badge:not(.monaco-decoration-text-badge)::after`;
+  const gitCss =
+    "\n/* Git status marks lifted clear of a painted row (see setGitVars). */\n" +
+    `${letter('.fc-git-ink')} {\n\tcolor: var(--fc-git-fg) !important;\n}\n` +
+    // The dot is a codicon at opacity .4, which would undo any lift — so a row we
+    // took over gets it at full strength, with a halo in the plate colour standing
+    // in for the design's "dark ring".
+    `${dot('.fc-git-ink')} {\n` +
+    '\tcolor: var(--fc-git-dot, var(--fc-git-fg)) !important;\n' +
+    '\topacity: 1 !important;\n' +
+    '\ttext-shadow: 0 0 2px var(--fc-git-plate, transparent);\n' +
+    '}\n' +
+    // The chip itself: a small square plate with the letter centred in it, as the
+    // design draws it. `inline-flex` is what centres a single character in a box
+    // this size; the letter's own `margin` is VS Code's and is left alone so the
+    // row's layout does not shift under it.
+    `${letter('.fc-git-chip')},\n${letter('.fc-git-outline')} {\n` +
+    '\tbox-sizing: border-box;\n' +
+    '\tdisplay: inline-flex;\n' +
+    '\talign-items: center;\n' +
+    '\tjustify-content: center;\n' +
+    '\tmin-width: 15px;\n' +
+    '\theight: 15px;\n' +
+    '\tpadding: 0 2px;\n' +
+    '\tline-height: 1;\n' +
+    '\tborder-radius: 3px;\n' +
+    '\tborder: 1px solid var(--fc-git-border, transparent);\n' +
+    '}\n' +
+    `${letter('.fc-git-chip')} {\n\tbackground: var(--fc-git-plate, transparent);\n}\n` +
+    `${letter('.fc-git-outline')} {\n\tbackground: transparent;\n}\n` +
+    // `gitMarkStyle: "none"` hides the letter and the dot; the filename still lifts.
+    `${letter('.fc-git-off')},\n${dot('.fc-git-off')} {\n\tdisplay: none !important;\n}\n`;
+
+  return header + editCss + hoverCss + gitCss +
     '\n/* Selected-row label + twistie. */\n' +
     selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
     selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n' +

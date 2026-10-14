@@ -55,7 +55,7 @@ Generate-time pipeline, all triggered from
 [extension.ts](src/extension.ts) on activation, settings change, workspace-folder
 change, or a `**/.git` watcher event:
 
-1. [config.ts](src/config.ts) — `readConfig()` flattens all 75 `premiumExplorer.*`
+1. [config.ts](src/config.ts) — `readConfig()` flattens all 111 `premiumExplorer.*`
    settings into a `FolderColorerConfig`. Rules are resolved to absolute paths and
    **sorted deepest-path-first**, so `deepestRuleFor()` returning the first match
    is what implements "a deeper rule wins".
@@ -67,8 +67,9 @@ change, or a `**/.git` watcher event:
    folder is finished before anything nested in it.
 3. [layers.ts](src/layers.ts) — `buildPart()` turns one folder's `PartConfig`
    into ready-to-apply CSS values: background fill, striped edge bar, label pill,
-   text style, tiled watermark. Five independent layers, baked separately for the
-   `root` row and the `inner` rows.
+   text style, tiled watermark and the single stamped `mark`. Six independent
+   layers, baked separately for the `root` row and the `inner` rows, plus the
+   corner radii (resolved to four numbers each).
 4. [workspaceState.ts](src/workspaceState.ts) merges the baked folders and the
    selection options into the persisted per-workspace unions, and the result is
    serialized as `premium-explorer.json` — the file the static
@@ -91,8 +92,16 @@ with every message and prompt left to [injection.ts](src/injection.ts).
 - **Bake at generate time; the painter only picks.** [inject.js](media/inject.js)
   should choose among pre-computed values, not recompute them. The deliberate
   exceptions are things only the browser knows: what a translucent row composites
-  over, the auto watermark tint, the pane width for the watermark clearing, and
-  where a row's text actually ends.
+  over, the auto watermark tint, the pane width for the watermark clearing, where
+  a row's text actually ends (the `mark`'s position), how tall a folder's
+  rendered **block** is (a `block`-scaled fill and block corner rounding), and
+  what colour VS Code gave a git decoration (the `git*` lift).
+- **`paint()` walks the tree before it paints anything.** Two passes, because a
+  block's *extent* is only known once the whole rendered slice has been walked:
+  the first records each row's folder, its block, and whether that block is
+  `closed` (a shallower row came after it, so its end is real rather than
+  scrolled out of view); the second paints. A block still open when the rows run
+  out keeps its bottom corners square instead of drawing a false end.
 - **`inherit` reads the ancestor's baked `inner` part.** That is why bake order is
   shallowest-first; `NO_ANCESTOR_FALLBACK` covers a top-level folder.
 - **Folders are matched by *path*, which the browser has to reconstruct.** The DOM
@@ -141,6 +150,68 @@ A per-layer setting touches at least four places, all of which use the same flat
 default) and `readPartOverride()` (per-rule override) in
 [config.ts](src/config.ts) — then whatever consumes it in
 [layers.ts](src/layers.ts) and [media/inject.js](media/inject.js).
+
+### Git decorations, in the DOM
+
+Worth knowing before touching the `git*` keys, because none of it is documented
+and all of it was read out of devtools:
+
+- VS Code renders a file decoration as a **generated class** on
+  `.monaco-icon-label` — `monaco-decoration-itemColor-<hash>` for the filename's
+  colour, with a sibling `::after` rule carrying the status letter (a file) or the
+  dot (a folder). The hash is minted at runtime, so **no stylesheet can name it**.
+- Those rules are **not `!important`**, and the colour reaches `.label-name` by
+  inheritance — so a plain inline `color` on the label wins, no weight needed.
+- The letter and the dot are `::after` **pseudo-elements**, so they cannot be
+  styled inline at all. What *can* be named is the stable class beside the hash:
+  `.monaco-decoration-text-badge` is the letter, and a `.monaco-decoration-badge`
+  without it is the dot. [generatedCss.ts](src/generatedCss.ts) keys off those and
+  the painter publishes the colours as custom properties, like `--fc-sel-fg`.
+- The `::after` rule sets its own `color`, so it keeps reporting **Git's**
+  intended colour even through our `!important` selected-label rules — which is
+  how the painter reads the status colour back (`decorationHex()`), cached per
+  decoration and dropped every paint.
+- The status itself is identified by matching that colour against the four
+  `--vscode-gitDecoration-*ResourceForeground` theme colours. Never parse the
+  `aria-label`: it is localized prose.
+- **Deleted files have no row in the Explorer**, so the design's "strikethrough
+  on deleted" case does not arise there; the `deleted` status reaches a row only
+  through a folder's combined dot. VS Code draws the strikethrough itself from
+  `FileDecoration.strikethrough` where it does apply, and we neither add nor
+  remove it — only `color` is ever written.
+- **Selection outranks Git**, per the design: on a selected row the label takes
+  the selection's text colour and the status colour is dropped, because the
+  chip's plate and border still say which status it is. The chip inverts to
+  dark-on-light there so the letter survives a bright selection. This is the one
+  style that does *not* go through `selectedOverrides`.
+
+### The symlink mark is a character inside Git's badge
+
+VS Code *does* mark a symlink — but not the way the design handoff assumed, and
+not anywhere it can be styled on its own. Verified in devtools (1.141):
+
+- The mark is a **`⤷` appended to the single FileDecoration badge**, not a
+  separate element at the row's right edge: the generated rule reads
+  `content: "U, ⤷"` and its colour is Git's
+  `--vscode-gitDecoration-untrackedResourceForeground`. With no git status it is
+  the badge on its own; with one, the two share the slot, comma-separated.
+  `scanDecorations()` reads that `content` string, which is how the painter tells
+  an arrow-only badge (ours to colour, via `symlinkMarkColor`) from one sharing
+  the slot with a status letter (Git's colouring governs, because there is only
+  one colour to give).
+- So it **cannot be coloured independently of Git's letter** — they are one
+  `::after`. Anything that restyles the git badge restyles the arrow with it,
+  which is why `gitMarkStyle: chip` plates `U, ⤷` as one chip.
+- `premiumExplorer.badge` on a manual rule takes that slot outright, hiding the
+  git letter *and* the arrow.
+- A **compressed** row (VS Code collapsing `linked/nested` into one row) carries
+  no decoration for the outer segment, so the mark disappears there.
+
+`premiumExplorer.symlinkMark` therefore draws **our own** mark through the EM-94
+mark layer: at the label rather than the badge, in its own colour, and surviving
+a `badge` that has taken the slot. It reaches only a folder a rule names —
+symlink-ness is an `lstat` host-side, and the painter has no per-row path for
+anything else.
 
 ### Adding a built-in watermark glyph
 

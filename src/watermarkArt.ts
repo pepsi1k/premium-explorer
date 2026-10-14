@@ -44,7 +44,7 @@ export function resolveWatermarkArt(source: string, absPath: string, extensionRo
   const parsed = markup ? parseSvgMarkup(markup) : undefined;
   if (parsed) {
     // Seed off the source, not the markup, so the scatter survives edits to the file.
-    return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, key: source };
+    return { kind: 'svg', content: parsed.body, viewBox: parsed.viewBox, fill: parsed.fill, key: source };
   }
   if (isPath) {
     console.warn(`premium-explorer: could not load backgroundWatermarkSymbol "${source}"`);

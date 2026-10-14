@@ -8,7 +8,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { paletteSequence } from './colors';
+import { WatermarkArt, paletteSequence } from './colors';
 import { ColoredFolder, Part, buildPart } from './layers';
 import { PartConfig, FolderColorerConfig, ResolvedRule, deepestRuleFor, gitRepoColorHex } from './config';
 import { findRepositories } from './repositoryScanner';
@@ -18,6 +18,12 @@ import { resolveWatermarkArt } from './watermarkArt';
 export interface FolderColors {
   root: Part;
   inner: Part;
+  /**
+   * `"block"` (the default) rounds the folder's rendered block as one plate rather
+   * than each row separately. It lives here, not on a part, because the root row
+   * and the last inner row have to agree about one outline.
+   */
+  radiusScale: 'row' | 'block';
 }
 
 /** Is `target` the same path as `ancestor`, or somewhere inside it? */
@@ -53,10 +59,13 @@ export async function resolveColoredFolders(config: FolderColorerConfig, extensi
         continue;
       }
       const hex = gitRepoColorHex(config, repo);
+      const parts = symlinkMarked(config, repo.fsPath,
+        symlinkAdjusted(config, repo.fsPath, mergedParts(rule, config)));
       byPath.set(repo.fsPath, {
         name, hex, absPath: repo.fsPath,
-        ...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol),
-        ...symlinkAdjusted(config, repo.fsPath, mergedParts(rule, config)),
+        radiusScale: rule.radiusScale ?? config.radiusScale,
+        ...identityOf(config, name, repo.fsPath, hex, extensionRoot, rule.backgroundWatermarkSymbol, parts),
+        ...parts,
       });
     }
   }
@@ -72,10 +81,13 @@ export async function resolveColoredFolders(config: FolderColorerConfig, extensi
         continue;
       }
       const name = path.basename(rule.absPath);
+      const parts = symlinkMarked(config, rule.absPath,
+        symlinkAdjusted(config, rule.absPath, mergedParts(rule, config)));
       byPath.set(rule.absPath, {
         name, hex: '', absPath: rule.absPath,
-        ...identityOf(config, name, rule.absPath, '', extensionRoot, rule.backgroundWatermarkSymbol),
-        ...symlinkAdjusted(config, rule.absPath, mergedParts(rule, config)),
+        radiusScale: rule.radiusScale ?? config.radiusScale,
+        ...identityOf(config, name, rule.absPath, '', extensionRoot, rule.backgroundWatermarkSymbol, parts),
+        ...parts,
       });
     }
   }
@@ -107,6 +119,7 @@ export function bakeAll(colored: ColoredFolder[]): Map<string, FolderColors> {
     baked.set(folder.absPath, {
       root: buildPart(folder, folder.root, inheritFrom),
       inner: buildPart(folder, folder.inner, inheritFrom),
+      radiusScale: folder.radiusScale,
     });
   }
   return baked;
@@ -123,6 +136,34 @@ function isSymlink(absPath: string): boolean {
 
 /** How much a symlinked folder's fill/pill layers are dimmed under `symlinkStyle: "dim"`. */
 const SYMLINK_OPACITY_FACTOR = 0.55;
+
+/**
+ * Stamp `symlinkMark` on a folder that is itself a symlink.
+ *
+ * VS Code's own symlink mark is a `⤷` appended to the single FileDecoration
+ * badge, sharing that slot — and Git's colour — with the status letter
+ * (`content: "U, ⤷"`). It cannot be coloured on its own, it vanishes on a
+ * compressed row, and `premiumExplorer.badge` hides it by taking the slot. So this
+ * draws our own mark instead, beside the label and in its own colour (EM-97).
+ *
+ * It reaches only a folder a rule names, because that is the only place
+ * symlink-ness is known: the check is an `lstat` here, host-side, and the painter
+ * matches rows by path relative to the workspace folder — a symlink *inside* a
+ * coloured folder has no row of its own in any of this.
+ */
+function symlinkMarked(
+  config: FolderColorerConfig,
+  absPath: string,
+  parts: { root: PartConfig; inner: PartConfig },
+): { root: PartConfig; inner: PartConfig } {
+  if (!config.symlinkMark || config.symlinkStyle === 'none' || !isSymlink(absPath)) {
+    return parts;
+  }
+  return {
+    root: { ...parts.root, mark: config.symlinkMark, markColor: config.symlinkMarkTint ?? parts.root.markColor },
+    inner: parts.inner,
+  };
+}
 
 /**
  * A symlink only reaches here when a rule names its path *and* the user opted into
@@ -160,15 +201,28 @@ function identityOf(
   absPath: string,
   hex: string,
   extensionRoot: string,
-  watermark?: string,
-): Pick<ColoredFolder, 'sequence' | 'art'> {
+  watermark: string[] | undefined,
+  parts: { root: PartConfig; inner: PartConfig },
+): Pick<ColoredFolder, 'sequence' | 'arts' | 'markArt'> {
   const basis = config.colorBy === 'path' ? absPath : name;
-  const source = watermark || config.backgroundWatermarkSymbol || (Array.from(name)[0] ?? '').toUpperCase();
+  const sources = watermark?.length ? watermark
+    : config.backgroundWatermarkSymbol.length ? config.backgroundWatermarkSymbol
+      : [(Array.from(name)[0] ?? '').toUpperCase()];
+  // The `mark` layer takes the same sources as the watermark, so it is resolved the
+  // same way — once per distinct source, since the root and inner rows usually
+  // name the same one (or none at all).
+  const markArt: Record<string, WatermarkArt> = {};
+  for (const mark of [parts.root.mark, parts.inner.mark]) {
+    if (mark && !markArt[mark]) {
+      markArt[mark] = resolveWatermarkArt(mark, absPath, extensionRoot);
+    }
+  }
   return {
     // No base color (a manual rule) -> no auto-derived sequence: the edge then
     // paints only from an explicit `edgeColors`/`edgeColor`.
     sequence: hex ? paletteSequence(basis, config.palette, config.edgeColorCount, hex) : [],
-    art: resolveWatermarkArt(source, absPath, extensionRoot),
+    arts: sources.map(source => resolveWatermarkArt(source, absPath, extensionRoot)),
+    markArt,
   };
 }
 

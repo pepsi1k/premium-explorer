@@ -3,6 +3,75 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.4.0] - 2026-10-14
+
+### Added
+- **Fills that span a whole folder.** A multi-stop fill can now be stretched
+  over a folder's rendered block instead of repeating inside every 22px row —
+  `rootBackgroundFillScale`/`innerBackgroundFillScale`, `auto | row | block`.
+- **Rounded corners** for the row fill and the edge bar, not just the pill:
+  `rootBackgroundRadius`, `rootEdgeRadius` and the `inner*` twins, each taking
+  one number or the per-corner CSS form (`[6, 6, 0, 0]`, `"6 6 0 0"`).
+  `premiumExplorer.radiusScale` rounds the folder's whole block as one plate
+  (the default) or each row on its own.
+- **A mark beside a folder's name** — `rootMark`/`innerMark`, taking the same
+  sources as the watermark (a shipped glyph, an `.svg`, a character), stamped
+  at full size in its own colours just past the label, with `*MarkColor`,
+  `*MarkSize` and `*MarkGap`. It does not compete with Git's status letter.
+  `*MarkInPill` grows the pill to enclose it.
+- **Watermark layouts** — `rootWatermarkLayout`/`innerWatermarkLayout`:
+  `scatter` (unchanged), `right-edge` (a band clear of the filenames), `row`
+  (one line of glyphs in the top band) and `corner` (a single oversized badge).
+- **Mixed watermark glyphs** — `backgroundWatermarkSymbol` now takes a list,
+  and each copy on the canvas picks one.
+- **Git status marks that stay readable over a fill** — `gitMarkStyle`
+  (`chip`, the new default, plus `bare`, `outline`, `solid`, `none`) with
+  `gitMarkColor`, `gitMarkBackgroundColor`, `gitMarkBorderColor`,
+  `gitLabelColor`, `gitFolderDotColor` and `gitMarkContrast`.
+- **Rename treatments** — `premiumExplorer.selectedRenameStyle`:
+  `dim` (unchanged), `field`, or `edge`.
+- **Pill padding** — `rootPillPadding`/`innerPillPadding`.
+- **The symlink arrow is colourable** — `premiumExplorer.symlinkMarkColor`,
+  defaulting to the tree's own icon ink and following the selection's text
+  colour on a selected row.
+
+### Fixed
+- **Diagonal and vertical fills no longer look horizontal.** A CSS gradient
+  splits its colour change between the two axes in proportion to the box it
+  fills, and a row is about 300x22px — so a diagonal had about 7% of its
+  change left on the vertical axis and was indistinguishable from
+  `horizontal`, while `vertical` repeated its whole fade inside every row.
+  Anything with a vertical component is now stretched over the folder's block
+  by default; a purely horizontal fill is unchanged, because it reads the same
+  either way.
+- **Git's status colours are lifted clear of a painted row.** Over an amber
+  fill the modified label measured 3.4:1, added 2.5:1 and deleted 1.3:1
+  against a 4.5:1 target. Each mark is now lifted until it reads against the
+  colour the row actually shows — and no further, so it keeps as much of its
+  status colour as the target allows. The letter sits on a plate stepped off
+  the row's own ground with a border in Git's own hex, and a folder's change
+  dot is shown at full strength instead of 40%.
+- **The painter no longer throws in a workspace with no rules.** It read a
+  variable that was not in scope, so every tree change raised an error — and a
+  workspace with colours but no selection entry of its own painted nothing at
+  all.
+- **A one-colour icon is no longer drawn black.** Artwork that paints by
+  inheriting a `fill` from its own root `<svg>` lost that colour, which made
+  it invisible on a dark row wherever it was meant to keep its own colours.
+- Baked colours no longer carry float noise such as
+  `rgba(42, 157, 143, 0.30250000000000005)`.
+
+### Changed
+- The tiled watermark now treats Git's status letter and a folder's change dot
+  as text: a glyph that touches one is dimmed whole, the way it already was
+  for filenames.
+- Selection outranks Git: on a selected row the filename takes
+  `selectedTextColor` and the status colour is dropped, since the letter's
+  plate and border still carry it. The chip inverts to dark-on-light there.
+- The `example/` workspace gained demo folders for every one of the above, and
+  the automated check that bakes it now asserts 106 things about what reaches
+  the painter.
+
 ## [2.3.3] - 2026-10-14
 
 ### Changed
