@@ -16,5 +16,11 @@
         // "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
         // "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
         // "noUnusedParameters": true,  /* Report errors on unused parameters. */
-    }
+    },
+    // The extension's own sources. Without this, the default include pattern
+    // sweeps in the sample sources under example/ — which exist to be looked at
+    // in the Explorer, not compiled — and each one fails the `rootDir` check.
+    "include": [
+        "src"
+    ]
 }

@@ -1,121 +1,444 @@
 {
   "premiumExplorer.enabled": true,
   "premiumExplorer.symlinkFolders": "none",
-  "premiumExplorer.backgroundWatermarkSymbol": "docker",
+  "premiumExplorer.selectedBackgroundColor": "#ffffff",
+  "premiumExplorer.selectedTextColor": "#0d1330",
+  "premiumExplorer.selectedOpacity": 1,
   "premiumExplorer.rules": [
     {
-      "path": "./edge-horizontal-bands",
-      "rootBackgroundColor": "#3b4a69",
-      "rootEdge": "solid",
-      "rootEdgeColors": ["#ff6b6b", "#feca57", "#48dbfb"],
-      "rootEdgeDirection": "horizontal",
-      "rootEdgeBlend": "bands",
-      "rootEdgeWidth": 6
+      "path": "./backgrounds/01-solid",
+      "rootBackgroundColor": "#4363d8",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundColor": "#4363d8",
+      "innerBackgroundOpacity": 0.14
     },
     {
-      "path": "./edge-diagonal-gradient",
-      "rootBackgroundColor": "#305c55",
+      "path": "./backgrounds/02-split-vertical",
+      "rootBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "vertical"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "vertical"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./backgrounds/03-split-horizontal",
+      "rootBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "horizontal"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "horizontal"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./backgrounds/04-split-diagonal",
+      "rootBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#e6194b", "#4363d8"],
+        "blend": "split",
+        "direction": "diagonal"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./backgrounds/05-gradient-horizontal",
+      "rootBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "horizontal"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "horizontal"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./backgrounds/06-gradient-vertical",
+      "rootBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "vertical"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "vertical"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./backgrounds/07-gradient-diagonal",
+      "rootBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "diagonal"
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#911eb4", "#008080", "#c99700"],
+        "direction": "diagonal"
+      },
+      "innerBackgroundOpacity": 0.14
+    },
+
+    {
+      "path": "./alpha-gradients/fade-in",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#4363d8", "alpha": 0, "at": 0 },
+          { "color": "#4363d8", "alpha": 0, "at": 15 },
+          { "color": "#4363d8", "alpha": 0.85, "at": 75 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#4363d8", "alpha": 0, "at": 0 },
+          { "color": "#4363d8", "alpha": 0, "at": 15 },
+          { "color": "#4363d8", "alpha": 0.85, "at": 75 }
+        ]
+      }
+    },
+    {
+      "path": "./alpha-gradients/fade-out",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#e6194b", "alpha": 0.8, "at": 0 },
+          { "color": "#e6194b", "alpha": 0, "at": 70 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#e6194b", "alpha": 0.8, "at": 0 },
+          { "color": "#e6194b", "alpha": 0, "at": 70 }
+        ]
+      }
+    },
+    {
+      "path": "./alpha-gradients/island",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#008080", "alpha": 0, "at": 0 },
+          { "color": "#008080", "alpha": 0.75, "at": 40 },
+          { "color": "#008080", "alpha": 0.75, "at": 60 },
+          { "color": "#008080", "alpha": 0, "at": 100 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#008080", "alpha": 0, "at": 0 },
+          { "color": "#008080", "alpha": 0.75, "at": 40 },
+          { "color": "#008080", "alpha": 0.75, "at": 60 },
+          { "color": "#008080", "alpha": 0, "at": 100 }
+        ]
+      }
+    },
+    {
+      "path": "./alpha-gradients/transparent-gap",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#911eb4", "alpha": 0.8, "at": 0 },
+          { "color": "#911eb4", "alpha": 0, "at": 35 },
+          { "color": "#f58231", "alpha": 0, "at": 60 },
+          { "color": "#f58231", "alpha": 0.8, "at": 100 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#911eb4", "alpha": 0.8, "at": 0 },
+          { "color": "#911eb4", "alpha": 0, "at": 35 },
+          { "color": "#f58231", "alpha": 0, "at": 60 },
+          { "color": "#f58231", "alpha": 0.8, "at": 100 }
+        ]
+      }
+    },
+    {
+      "path": "./alpha-gradients/diagonal-120",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": 120,
+        "stops": [
+          { "color": "#008080", "alpha": 0, "at": 0 },
+          { "color": "#008080", "alpha": 0.7, "at": 35 },
+          { "color": "#4363d8", "alpha": 0.7, "at": 65 },
+          { "color": "#e6194b", "alpha": 0, "at": 100 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": 120,
+        "stops": [
+          { "color": "#008080", "alpha": 0, "at": 0 },
+          { "color": "#008080", "alpha": 0.7, "at": 35 },
+          { "color": "#4363d8", "alpha": 0.7, "at": 65 },
+          { "color": "#e6194b", "alpha": 0, "at": 100 }
+        ]
+      }
+    },
+    {
+      "path": "./alpha-gradients/vertical-180",
+      "rootBackgroundOpacity": 1,
+      "rootBackgroundFill": {
+        "direction": "vertical",
+        "stops": [
+          { "color": "#c99700", "alpha": 0.85, "at": 0 },
+          { "color": "#c99700", "alpha": 0, "at": 100 }
+        ]
+      },
+      "innerBackgroundOpacity": 0.3,
+      "innerBackgroundFill": {
+        "direction": "vertical",
+        "stops": [
+          { "color": "#c99700", "alpha": 0.85, "at": 0 },
+          { "color": "#c99700", "alpha": 0, "at": 100 }
+        ]
+      }
+    },
+
+    {
+      "path": "./edge-bar/bands-horizontal",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.2,
       "rootEdge": "solid",
-      "rootEdgeColors": ["#ff6b6b", "#feca57", "#48dbfb"],
+      "rootEdgeColors": ["#e6194b", "#c99700", "#3cb44b"],
+      "rootEdgeDirection": "horizontal",
+      "rootEdgeBlend": "bands",
+      "rootEdgeWidth": 6,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.08
+    },
+    {
+      "path": "./edge-bar/bands-diagonal",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.2,
+      "rootEdge": "solid",
+      "rootEdgeColors": ["#e6194b", "#c99700", "#3cb44b"],
+      "rootEdgeDirection": "diagonal",
+      "rootEdgeBlend": "bands",
+      "rootEdgeWidth": 6,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.08
+    },
+    {
+      "path": "./edge-bar/bands-diagonal-reverse",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.2,
+      "rootEdge": "solid",
+      "rootEdgeColors": ["#e6194b", "#c99700", "#3cb44b"],
+      "rootEdgeDirection": "diagonal-reverse",
+      "rootEdgeBlend": "bands",
+      "rootEdgeWidth": 6,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.08
+    },
+    {
+      "path": "./edge-bar/blended-gradient",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.2,
+      "rootEdge": "solid",
+      "rootEdgeColors": ["#e6194b", "#c99700", "#3cb44b"],
       "rootEdgeDirection": "diagonal",
       "rootEdgeBlend": "gradient",
       "rootEdgeWidth": 6,
-      "rootEdgeStripeSize": 8
+      "rootEdgeStripeSize": 10,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.08
     },
     {
-      "path": "./edge-one-color",
-      "rootBackgroundColor": "#6d3040",
+      "path": "./edge-bar/single-colour",
+      "rootBackgroundColor": "#3cb44b",
+      "rootBackgroundOpacity": 0.2,
       "rootEdge": "solid",
-      "rootEdgeColor": "#e4b363"
+      "rootEdgeColor": "#008080",
+      "rootEdgeWidth": 3,
+      "innerBackgroundColor": "#3cb44b",
+      "innerBackgroundOpacity": 0.08
     },
+
     {
-      "path": "./pill-solid",
+      "path": "./pills/solid",
       "rootPill": "solid",
       "rootPillFill": { "stops": [{ "color": "#7c4db4", "alpha": 0.55 }] }
     },
     {
-      "path": "./pill-fade-in",
+      "path": "./pills/fade-in",
       "rootPill": "solid",
       "rootPillFill": {
+        "direction": "horizontal",
         "stops": [
-          { "color": "#14b8a6", "alpha": 0 },
-          { "color": "#14b8a6", "alpha": 0.55, "at": 70 }
+          { "color": "#2db4a0", "alpha": 0, "at": 0 },
+          { "color": "#2db4a0", "alpha": 0.55, "at": 70 }
         ]
       }
     },
     {
-      "path": "./pill-multi-stop",
+      "path": "./pills/multi-stop",
       "rootPill": "solid",
       "rootPillFill": {
+        "direction": "horizontal",
         "stops": [
-          { "color": "#7c4db4", "alpha": 0 },
-          { "color": "#7c4db4", "alpha": 0.5, "at": 45 },
-          { "color": "#e64980", "alpha": 0.6, "at": 100 }
+          { "color": "#8b5cf6", "alpha": 0, "at": 0 },
+          { "color": "#8b5cf6", "alpha": 0.5, "at": 45 },
+          { "color": "#ec4899", "alpha": 0.6, "at": 100 }
         ]
       }
     },
     {
-      "path": "./pill-fade-both",
+      "path": "./pills/both-ends",
       "rootPill": "solid",
       "rootPillFill": {
+        "direction": "horizontal",
         "stops": [
-          { "color": "#e4a11b", "alpha": 0 },
+          { "color": "#e4a11b", "alpha": 0, "at": 0 },
           { "color": "#e4a11b", "alpha": 0.5, "at": 35 },
           { "color": "#e8590c", "alpha": 0.5, "at": 65 },
-          { "color": "#e8590c", "alpha": 0 }
+          { "color": "#e8590c", "alpha": 0, "at": 100 }
         ]
       }
     },
     {
-      "path": "./fill-string-solid",
-      "rootBackgroundFill": "#305c55"
+      "path": "./pills/radius-square",
+      "rootPill": "solid",
+      "rootPillFill": { "stops": [{ "color": "#7c4db4", "alpha": 0.55 }] },
+      "rootPillRadius": 0
     },
     {
-      "path": "./fill-gradient-bg",
+      "path": "./pills/radius-full",
+      "rootPill": "solid",
+      "rootPillFill": { "stops": [{ "color": "#7c4db4", "alpha": 0.55 }] },
+      "rootPillRadius": 9
+    },
+
+    {
+      "path": "./inner-styles/inherit",
       "rootBackgroundFill": {
-        "stops": [
-          { "color": "#1c3aae", "alpha": 0.1 },
-          { "color": "#7c4db4", "alpha": 0.5 }
-        ],
+        "stops": ["#911eb4", "#4363d8"],
         "direction": "horizontal"
-      }
+      },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "stops": ["#911eb4", "#4363d8"],
+        "direction": "horizontal"
+      },
+      "innerBackgroundOpacity": 0.2
     },
     {
-      "path": "./fill-numeric-direction",
-      "rootBackgroundFill": {
+      "path": "./inner-styles/inherit/src",
+      "rootBackgroundStyle": "inherit"
+    },
+    {
+      "path": "./inner-styles/own-fill",
+      "rootBackgroundColor": "#911eb4",
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": {
+        "direction": "horizontal",
         "stops": [
-          { "color": "#1c3aae", "alpha": 0.1 },
-          { "color": "#7c4db4", "alpha": 0.5 }
-        ],
-        "direction": 90
-      }
+          { "color": "#008080", "alpha": 0.45, "at": 0 },
+          { "color": "#008080", "alpha": 0, "at": 85 }
+        ]
+      },
+      "innerBackgroundOpacity": 1
     },
     {
-      "path": "./fill-split-blend",
-      "rootBackgroundFill": {
-        "stops": [
-          { "color": "#1c3aae", "alpha": 0.4 },
-          { "color": "#7c4db4", "alpha": 0.4 }
-        ],
-        "blend": "split"
-      }
-    },
-    {
-      "path": "./fill-wins-over-color",
-      "rootBackgroundColor": "#ff0000",
-      "rootBackgroundFill": "#00ff0080"
-    },
-    {
-      "path": "./fill-hex-alpha-multiply",
-      "rootBackgroundFill": { "stops": [{ "color": "#14b8a680", "alpha": 0.5 }] }
-    },
-    {
-      "path": "./regression-inner-none",
-      "rootBackgroundColor": "#4a2e55",
+      "path": "./inner-styles/none",
+      "rootBackgroundColor": "#911eb4",
+      "rootBackgroundOpacity": 0.55,
       "innerBackgroundStyle": "none"
     },
     {
-      "path": "./regression-bare-rule"
+      "path": "./inner-styles/pill-and-edge",
+      "rootBackgroundColor": "#4363d8",
+      "rootBackgroundOpacity": 0.4,
+      "rootPill": "solid",
+      "rootPillColor": "#6e4680",
+      "innerBackgroundStyle": "none",
+      "innerPill": "solid",
+      "innerPillFill": {
+        "direction": "horizontal",
+        "stops": [
+          { "color": "#2db4a0", "alpha": 0, "at": 0 },
+          { "color": "#2db4a0", "alpha": 0.45, "at": 80 }
+        ]
+      },
+      "innerEdge": "solid",
+      "innerEdgeColor": "#4363d8",
+      "innerEdgeWidth": 2
+    },
+
+    {
+      "path": "./rotation/deg-0",
+      "rootBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 0 },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 0 },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./rotation/deg-45",
+      "rootBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 45 },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 45 },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./rotation/deg-90",
+      "rootBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 90 },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 90 },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./rotation/deg-120",
+      "rootBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 120 },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 120 },
+      "innerBackgroundOpacity": 0.14
+    },
+    {
+      "path": "./rotation/deg-180",
+      "rootBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 180 },
+      "rootBackgroundOpacity": 0.55,
+      "innerBackgroundFill": { "stops": ["#4363d8", "#e6194b"], "direction": 180 },
+      "innerBackgroundOpacity": 0.14
+    },
+
+    {
+      "path": "./regression/bare-rule"
+    },
+    {
+      "path": "./regression/inner-none",
+      "rootBackgroundColor": "#4a2e55",
+      "innerBackgroundStyle": "none"
     }
   ]
 }

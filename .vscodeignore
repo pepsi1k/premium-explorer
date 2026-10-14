@@ -22,3 +22,10 @@ assets/logo/logo-128.png
 dist/*.svg
 dist/out/**
 .claude/**
+# Repository-only material. The sample workspace is meant to be opened from a
+# clone (and is the test fixture); the design handoff and the local zip are
+# working files — none of it belongs in an installed extension.
+example/**
+tmp/**
+*.zip
+docs/**

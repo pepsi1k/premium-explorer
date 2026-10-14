@@ -3,6 +3,21 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.3.1] - 2026-10-14
+
+### Fixed
+- **The published extension no longer carries repository-only files.** Design
+  working files and the sample workspace were being packaged into the VSIX;
+  the install is now 37 files instead of 162 and roughly a third smaller.
+
+### Changed
+- The `example/` workspace in the repository now covers every feature as a
+  group of demos — background splits and blends in each direction, the
+  alpha-stop gradients from the design concepts, edge-bar directions and
+  blends, pill fills and radii, inner-row styling, and rotation by angle —
+  with files and nested folders inside each one so the `inner*` layers are
+  visible. Open it from a clone; it is not part of the installed extension.
+
 ## [2.3.0] - 2026-10-14
 
 ### Added
