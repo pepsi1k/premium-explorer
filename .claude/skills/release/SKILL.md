@@ -3,16 +3,16 @@ name: release
 description: Cut a new Premium Explorer release — bump, tag, push, and watch it through Marketplace verification.
 argument-hint: '[patch | minor | major | explicit version, e.g. 1.2.0]'
 disable-model-invocation: true
-allowed-tools: Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git tag:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(node:*), Bash(curl:*), Bash(pnpm:*), Read, Edit
+allowed-tools: Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git tag:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(node:*), Bash(gh run:*), Bash(pnpm:*), Read, Edit
 ---
 
 ## Release state
 
 - Version in package.json: !`node -p "require('./package.json').version" 2>&1`
-- Tags: !`git tag -l | tail -5 2>&1`
 - Working tree: !`git status --short 2>&1 | head -20`
 - Unpushed: !`git log --oneline origin/main..HEAD 2>&1 | head -10`
-- Live on the Marketplace: !`curl -sS -m 20 -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" -H "Accept: application/json;api-version=3.0-preview.1" -H "Content-Type: application/json" -d '{"filters":[{"criteria":[{"filterType":7,"value":"pepsik.premium-explorer"}],"pageNumber":1,"pageSize":100}],"flags":1}' 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const e=JSON.parse(s).results[0].extensions[0];console.log(e.versions.map(v=>v.version).join(', '));}catch(err){console.log('query failed');}})" 2>&1`
+- Released tags: !`git tag -l 'v*' | sort -V | tail -8 2>&1`
+- Last release run: !`gh run list --workflow=release.yml --limit 1 --json headBranch,status,conclusion,url --template '{{range .}}{{.headBranch}} {{.status}} {{.conclusion}} {{.url}}{{end}}' 2>&1`
 
 ## Task
 
@@ -22,10 +22,11 @@ Releases are tag-driven: pushing a `v*` tag runs `.github/workflows/release.yml`
 which verifies the tag against `package.json`, packages, publishes with `vsce`,
 waits for the Marketplace to finish verifying, then notifies Telegram.
 
-1. **Pick a version above every published one.** The list above is authoritative —
-   it comes from the gallery API, which returns validated versions only. A version
-   that has ever been accepted **can never be republished or overwritten**, so a
-   broken release is fixed by bumping, never by retrying.
+1. **Pick a version above every published one.** Go by the tag list above: every
+   release is tagged, so the highest tag is the highest version that ever reached
+   the Marketplace. A version that has ever been accepted **can never be
+   republished or overwritten**, so a broken release is fixed by bumping, never by
+   retrying.
 
 2. **Bump `package.json` and update `CHANGELOG.md`** with what actually changed.
    The changelog ships inside the VSIX and is shown on the Marketplace listing.
@@ -42,10 +43,15 @@ waits for the Marketplace to finish verifying, then notifies Telegram.
    must equal `package.json` exactly — the workflow's first step fails the run
    otherwise, which is the intended guard, not a bug.
 
-6. **Watch it land.** The workflow already polls, but to follow along locally:
-   `node scripts/wait-for-marketplace.mjs pepsik.premium-explorer <version>`.
-   Verification normally takes 3–8 minutes. Until it completes the Marketplace
-   shows "Verifying" and the version is not installable.
+6. **Hand over the workflow run.** `gh run list --workflow=release.yml --limit 1`
+   gives its URL; report that and stop. The run publishes, then confirms the new
+   version itself (`scripts/wait-for-marketplace.mjs`, which waits five minutes
+   and then asks about that one version at most ten times).
+
+   **Never query the Marketplace yourself** — not with `curl`, not through the
+   gallery API, not "just to check it went live". Repeating those checks is what
+   got the whole site answering "The request is blocked" (EM-106). The run's own
+   conclusion, and the Telegram message it sends, are the answer.
 
 ## Traps
 
@@ -61,5 +67,6 @@ waits for the Marketplace to finish verifying, then notifies Telegram.
 
 ## When done
 
-Report the tag pushed, the workflow run URL, and whether the version is live yet.
-If it's still verifying, say so — publishing is not the same as being installable.
+Report the tag pushed and the workflow run URL, and say that verification runs
+inside it — publishing is not the same as being installable, and the run is what
+reports which of the two happened. Do not go and check the Marketplace.

@@ -3,6 +3,19 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.3.3] - 2026-10-14
+
+### Changed
+- Pills on the rows inside a coloured folder are a little less round by
+  default (radius 3 instead of 6). `premiumExplorer.innerPillRadius` still
+  sets whatever you prefer.
+
+### Internal
+- Release tooling asks the Marketplace far less: it now waits for validation
+  to plausibly be finished, then checks only the version just published, a
+  handful of times, and stops rather than retrying when the gallery turns it
+  away.
+
 ## [2.3.2] - 2026-10-14
 
 ### Fixed

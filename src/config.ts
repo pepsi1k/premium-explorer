@@ -198,7 +198,7 @@ const ROOT_DEFAULTS: PartConfig = {
 const INNER_DEFAULTS: PartConfig = {
   backgroundStyle: 'inherit', backgroundOpacity: 0.15,
   edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'inherit', pillOpacity: 1, pillRadius: 6,
+  pill: 'inherit', pillOpacity: 1, pillRadius: 3,
   textStyle: 'none',
   watermarkStyle: 'inherit', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };

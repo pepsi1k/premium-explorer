@@ -60,10 +60,13 @@ jobs:
         id: validate
         continue-on-error: true
         env:
-          # Public repo: Actions minutes are free, so wait generously rather
-          # than give up while the marketplace is still validating.
-          TIMEOUT_SECONDS: '3600'
-          INTERVAL_SECONDS: '30'
+          # Ask sparingly: nothing can be live for the first five minutes, each
+          # check is a HEAD for this one version, and ATTEMPTS caps a release at
+          # a dozen requests. Polling harder than this is what got the gallery
+          # answering "The request is blocked" (EM-106).
+          DELAY_SECONDS: '300'
+          INTERVAL_SECONDS: '60'
+          ATTEMPTS: '10'
         run: |
           node scripts/wait-for-marketplace.mjs \
             pepsik.premium-explorer "${{ steps.version.outputs.version }}"
