@@ -1,0 +1,121 @@
+{
+  "premiumExplorer.enabled": true,
+  "premiumExplorer.symlinkFolders": "none",
+  "premiumExplorer.backgroundWatermarkSymbol": "docker",
+  "premiumExplorer.rules": [
+    {
+      "path": "./edge-horizontal-bands",
+      "rootBackgroundColor": "#3b4a69",
+      "rootEdge": "solid",
+      "rootEdgeColors": ["#ff6b6b", "#feca57", "#48dbfb"],
+      "rootEdgeDirection": "horizontal",
+      "rootEdgeBlend": "bands",
+      "rootEdgeWidth": 6
+    },
+    {
+      "path": "./edge-diagonal-gradient",
+      "rootBackgroundColor": "#305c55",
+      "rootEdge": "solid",
+      "rootEdgeColors": ["#ff6b6b", "#feca57", "#48dbfb"],
+      "rootEdgeDirection": "diagonal",
+      "rootEdgeBlend": "gradient",
+      "rootEdgeWidth": 6,
+      "rootEdgeStripeSize": 8
+    },
+    {
+      "path": "./edge-one-color",
+      "rootBackgroundColor": "#6d3040",
+      "rootEdge": "solid",
+      "rootEdgeColor": "#e4b363"
+    },
+    {
+      "path": "./pill-solid",
+      "rootPill": "solid",
+      "rootPillFill": { "stops": [{ "color": "#7c4db4", "alpha": 0.55 }] }
+    },
+    {
+      "path": "./pill-fade-in",
+      "rootPill": "solid",
+      "rootPillFill": {
+        "stops": [
+          { "color": "#14b8a6", "alpha": 0 },
+          { "color": "#14b8a6", "alpha": 0.55, "at": 70 }
+        ]
+      }
+    },
+    {
+      "path": "./pill-multi-stop",
+      "rootPill": "solid",
+      "rootPillFill": {
+        "stops": [
+          { "color": "#7c4db4", "alpha": 0 },
+          { "color": "#7c4db4", "alpha": 0.5, "at": 45 },
+          { "color": "#e64980", "alpha": 0.6, "at": 100 }
+        ]
+      }
+    },
+    {
+      "path": "./pill-fade-both",
+      "rootPill": "solid",
+      "rootPillFill": {
+        "stops": [
+          { "color": "#e4a11b", "alpha": 0 },
+          { "color": "#e4a11b", "alpha": 0.5, "at": 35 },
+          { "color": "#e8590c", "alpha": 0.5, "at": 65 },
+          { "color": "#e8590c", "alpha": 0 }
+        ]
+      }
+    },
+    {
+      "path": "./fill-string-solid",
+      "rootBackgroundFill": "#305c55"
+    },
+    {
+      "path": "./fill-gradient-bg",
+      "rootBackgroundFill": {
+        "stops": [
+          { "color": "#1c3aae", "alpha": 0.1 },
+          { "color": "#7c4db4", "alpha": 0.5 }
+        ],
+        "direction": "horizontal"
+      }
+    },
+    {
+      "path": "./fill-numeric-direction",
+      "rootBackgroundFill": {
+        "stops": [
+          { "color": "#1c3aae", "alpha": 0.1 },
+          { "color": "#7c4db4", "alpha": 0.5 }
+        ],
+        "direction": 90
+      }
+    },
+    {
+      "path": "./fill-split-blend",
+      "rootBackgroundFill": {
+        "stops": [
+          { "color": "#1c3aae", "alpha": 0.4 },
+          { "color": "#7c4db4", "alpha": 0.4 }
+        ],
+        "blend": "split"
+      }
+    },
+    {
+      "path": "./fill-wins-over-color",
+      "rootBackgroundColor": "#ff0000",
+      "rootBackgroundFill": "#00ff0080"
+    },
+    {
+      "path": "./fill-hex-alpha-multiply",
+      "rootBackgroundFill": { "stops": [{ "color": "#14b8a680", "alpha": 0.5 }] }
+    },
+    {
+      "path": "./regression-inner-none",
+      "rootBackgroundColor": "#4a2e55",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./regression-bare-rule"
+    }
+  ]
+}

@@ -3,6 +3,28 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.3.0] - 2026-10-14
+
+### Added
+- **Multi-stop fills** — one shared `Fill` vocabulary (see `docs/fill-spec.md`):
+  a plain hex (alpha-carrying `#rrggbbaa` allowed) or a stop list with per-stop
+  `alpha`/`at`, `blend: "split" | "gradient"`, and a `direction` (named or CSS
+  degrees). Stop alpha, hex alpha, and the layer's `*Opacity` multiply.
+- **Pill fills** — `rootPillFill`/`innerPillFill` (plus per-rule overrides):
+  solid, fade-in, multi-stop, or fade-both-ends pills; hover still brightens,
+  lifting every stop while transparent edges stay transparent.
+- **Edge bar direction and blend** — `rootEdgeDirection`/`innerEdgeDirection`
+  (`horizontal`, `vertical`, `diagonal`, `diagonal-reverse` — the old 45° look
+  stays the default) and `rootEdgeBlend`/`innerEdgeBlend` (`bands` keeps the
+  hard stripes, `gradient` blends the sequence seamlessly).
+- **Row background fills (experimental)** — `rootBackgroundFill`/
+  `innerBackgroundFill` paint a gradient across each row; everything that
+  derives from "the row's color" (watermark tint, selection shift/invert) uses
+  the fill's color at the row's centre. `selectedBackgroundFill` exists but is
+  still being finished alongside the at-scale background shapes.
+- An `example/` workspace in the repository showing every feature configured,
+  doubling as the automated test fixture (`scripts/verify-example.js`).
+
 ## [2.2.1] - 2026-10-13
 
 ### Changed

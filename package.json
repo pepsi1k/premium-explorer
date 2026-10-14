@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -113,6 +113,85 @@
                 ],
                 "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
+              "rootBackgroundFill": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "stops"
+                    ],
+                    "properties": {
+                      "stops": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "color-hex"
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "color"
+                              ],
+                              "properties": {
+                                "color": {
+                                  "type": "string",
+                                  "format": "color-hex"
+                                },
+                                "alpha": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1,
+                                  "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                                },
+                                "at": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100,
+                                  "description": "Position 0–100 (%). In a split fill, where this band ends."
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "description": "The colour stops, in order. A bare hex is an opaque stop."
+                      },
+                      "blend": {
+                        "type": "string",
+                        "enum": [
+                          "split",
+                          "gradient"
+                        ],
+                        "description": "split = hard edges between the colours; gradient = blended (the default)."
+                      },
+                      "direction": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "vertical",
+                              "horizontal",
+                              "diagonal",
+                              "diagonal-reverse"
+                            ]
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                      }
+                    }
+                  }
+                ],
+                "markdownDescription": "Multi-stop fill for the repo root row’s background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `rootBackgroundColor`; applies only while `rootBackgroundStyle` is `solid`. `rootBackgroundOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does)."
+              },
               "rootBackgroundOpacity": {
                 "type": "number",
                 "minimum": 0,
@@ -182,6 +261,85 @@
                   }
                 ],
                 "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
+              },
+              "rootPillFill": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "stops"
+                    ],
+                    "properties": {
+                      "stops": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "color-hex"
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "color"
+                              ],
+                              "properties": {
+                                "color": {
+                                  "type": "string",
+                                  "format": "color-hex"
+                                },
+                                "alpha": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1,
+                                  "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                                },
+                                "at": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100,
+                                  "description": "Position 0–100 (%). In a split fill, where this band ends."
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "description": "The colour stops, in order. A bare hex is an opaque stop."
+                      },
+                      "blend": {
+                        "type": "string",
+                        "enum": [
+                          "split",
+                          "gradient"
+                        ],
+                        "description": "split = hard edges between the colours; gradient = blended (the default)."
+                      },
+                      "direction": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "vertical",
+                              "horizontal",
+                              "diagonal",
+                              "diagonal-reverse"
+                            ]
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                      }
+                    }
+                  }
+                ],
+                "markdownDescription": "Multi-stop fill for the pill behind the repo root row’s label — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `rootPillColor`; applies only while `rootPill` is `solid`. `rootPillOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays invisible and the row shows through."
               },
               "rootPillOpacity": {
                 "type": "number",
@@ -254,6 +412,85 @@
                 ],
                 "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
+              "innerBackgroundFill": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "stops"
+                    ],
+                    "properties": {
+                      "stops": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "color-hex"
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "color"
+                              ],
+                              "properties": {
+                                "color": {
+                                  "type": "string",
+                                  "format": "color-hex"
+                                },
+                                "alpha": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1,
+                                  "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                                },
+                                "at": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100,
+                                  "description": "Position 0–100 (%). In a split fill, where this band ends."
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "description": "The colour stops, in order. A bare hex is an opaque stop."
+                      },
+                      "blend": {
+                        "type": "string",
+                        "enum": [
+                          "split",
+                          "gradient"
+                        ],
+                        "description": "split = hard edges between the colours; gradient = blended (the default)."
+                      },
+                      "direction": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "vertical",
+                              "horizontal",
+                              "diagonal",
+                              "diagonal-reverse"
+                            ]
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                      }
+                    }
+                  }
+                ],
+                "markdownDescription": "Multi-stop fill for the inner rows’ (files/folders inside) background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `innerBackgroundColor`; applies only while `innerBackgroundStyle` is `solid`. `innerBackgroundOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does)."
+              },
               "innerBackgroundOpacity": {
                 "type": "number",
                 "minimum": 0,
@@ -324,6 +561,85 @@
                 ],
                 "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
               },
+              "innerPillFill": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "color-hex"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "stops"
+                    ],
+                    "properties": {
+                      "stops": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "color-hex"
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "color"
+                              ],
+                              "properties": {
+                                "color": {
+                                  "type": "string",
+                                  "format": "color-hex"
+                                },
+                                "alpha": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1,
+                                  "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                                },
+                                "at": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100,
+                                  "description": "Position 0–100 (%). In a split fill, where this band ends."
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "description": "The colour stops, in order. A bare hex is an opaque stop."
+                      },
+                      "blend": {
+                        "type": "string",
+                        "enum": [
+                          "split",
+                          "gradient"
+                        ],
+                        "description": "split = hard edges between the colours; gradient = blended (the default)."
+                      },
+                      "direction": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "vertical",
+                              "horizontal",
+                              "diagonal",
+                              "diagonal-reverse"
+                            ]
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                      }
+                    }
+                  }
+                ],
+                "markdownDescription": "Multi-stop fill for the pill behind the inner rows (files/folders inside)’ label — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `innerPillColor`; applies only while `innerPill` is `solid`. `innerPillOpacity` multiplies on each stop’s alpha, so an alpha-0 stop stays invisible and the row shows through."
+              },
               "innerPillOpacity": {
                 "type": "number",
                 "minimum": 0,
@@ -387,6 +703,35 @@
                 "type": "number",
                 "minimum": 1,
                 "markdownDescription": "Thickness in px of one diagonal stripe band on the repo root row's edge bar."
+              },
+              "rootEdgeDirection": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "vertical",
+                      "horizontal",
+                      "diagonal",
+                      "diagonal-reverse"
+                    ]
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "markdownDescription": "Where the repo root row's edge stripe runs. `diagonal-reverse` is the classic 45° stripe (bottom-left → top-right); `diagonal` slants the other way; `vertical` runs top → bottom (horizontally stacked bands); `horizontal` runs left → right. A number is a CSS gradient angle in degrees."
+              },
+              "rootEdgeBlend": {
+                "type": "string",
+                "enum": [
+                  "bands",
+                  "gradient"
+                ],
+                "enumDescriptions": [
+                  "Hard-edged bands — the classic striped bar.",
+                  "The colour sequence blended smoothly into each other."
+                ],
+                "markdownDescription": "How the repo root row's edge colours are drawn."
               },
               "rootWatermarkStyle": {
                 "type": "string",
@@ -476,6 +821,35 @@
                 "type": "number",
                 "minimum": 1,
                 "markdownDescription": "Thickness in px of one diagonal stripe band on the inner rows (files/folders inside)'s edge bar."
+              },
+              "innerEdgeDirection": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "vertical",
+                      "horizontal",
+                      "diagonal",
+                      "diagonal-reverse"
+                    ]
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "markdownDescription": "Where the inner rows (files/folders inside)'s edge stripe runs. `diagonal-reverse` is the classic 45° stripe (bottom-left → top-right); `diagonal` slants the other way; `vertical` runs top → bottom (horizontally stacked bands); `horizontal` runs left → right. A number is a CSS gradient angle in degrees."
+              },
+              "innerEdgeBlend": {
+                "type": "string",
+                "enum": [
+                  "bands",
+                  "gradient"
+                ],
+                "enumDescriptions": [
+                  "Hard-edged bands — the classic striped bar.",
+                  "The colour sequence blended smoothly into each other."
+                ],
+                "markdownDescription": "How the inner rows (files/folders inside)'s edge colours are drawn."
               },
               "innerWatermarkStyle": {
                 "type": "string",
@@ -664,6 +1038,85 @@
           "default": "",
           "markdownDescription": "Color of the full-row fill for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
+        "premiumExplorer.rootBackgroundFill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "required": [
+                "stops"
+              ],
+              "properties": {
+                "stops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "color-hex"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "color"
+                        ],
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "format": "color-hex"
+                          },
+                          "alpha": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                          },
+                          "at": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Position 0–100 (%). In a split fill, where this band ends."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "The colour stops, in order. A bare hex is an opaque stop."
+                },
+                "blend": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "gradient"
+                  ],
+                  "description": "split = hard edges between the colours; gradient = blended (the default)."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "vertical",
+                        "horizontal",
+                        "diagonal",
+                        "diagonal-reverse"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                }
+              }
+            }
+          ],
+          "markdownDescription": "Multi-stop fill for the repo root row’s background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.rootBackgroundColor#`; applies only while `#premiumExplorer.rootBackgroundStyle#` is `solid`. `#premiumExplorer.rootBackgroundOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does). Edited in settings.json (objects have no Settings-UI editor)."
+        },
         "premiumExplorer.rootBackgroundOpacity": {
           "type": "number",
           "minimum": 0,
@@ -740,6 +1193,85 @@
           "default": "",
           "markdownDescription": "Color of the pill behind the label for the repo root row. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
+        "premiumExplorer.rootPillFill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "required": [
+                "stops"
+              ],
+              "properties": {
+                "stops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "color-hex"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "color"
+                        ],
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "format": "color-hex"
+                          },
+                          "alpha": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                          },
+                          "at": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Position 0–100 (%). In a split fill, where this band ends."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "The colour stops, in order. A bare hex is an opaque stop."
+                },
+                "blend": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "gradient"
+                  ],
+                  "description": "split = hard edges between the colours; gradient = blended (the default)."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "vertical",
+                        "horizontal",
+                        "diagonal",
+                        "diagonal-reverse"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                }
+              }
+            }
+          ],
+          "markdownDescription": "Multi-stop fill for the pill behind the repo root row’s label — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.rootPillColor#`; applies only while `#premiumExplorer.rootPill#` is `solid`. `#premiumExplorer.rootPillOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays invisible and the row shows through. Edited in settings.json (objects have no Settings-UI editor)."
+        },
         "premiumExplorer.rootPillOpacity": {
           "type": "number",
           "minimum": 0,
@@ -810,6 +1342,37 @@
           "minimum": 1,
           "default": 6,
           "markdownDescription": "Thickness in px of one diagonal stripe band on the repo root row's edge bar."
+        },
+        "premiumExplorer.rootEdgeDirection": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "vertical",
+                "horizontal",
+                "diagonal",
+                "diagonal-reverse"
+              ]
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "default": "diagonal-reverse",
+          "markdownDescription": "Where the repo root row's edge stripe runs. `diagonal-reverse` is the classic 45° stripe (bottom-left → top-right); `diagonal` slants the other way; `vertical` runs top → bottom (horizontally stacked bands); `horizontal` runs left → right. A number is a CSS gradient angle in degrees."
+        },
+        "premiumExplorer.rootEdgeBlend": {
+          "type": "string",
+          "enum": [
+            "bands",
+            "gradient"
+          ],
+          "enumDescriptions": [
+            "Hard-edged bands — the classic striped bar.",
+            "The colour sequence blended smoothly into each other."
+          ],
+          "default": "bands",
+          "markdownDescription": "How the repo root row's edge colours are drawn: hard-edged bands, or the sequence blended into a gradient. Band thickness stays `#premiumExplorer.rootEdgeStripeSize#` either way."
         },
         "premiumExplorer.rootWatermarkStyle": {
           "type": "string",
@@ -916,6 +1479,85 @@
           "default": "",
           "markdownDescription": "Color of the full-row fill for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
+        "premiumExplorer.innerBackgroundFill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "required": [
+                "stops"
+              ],
+              "properties": {
+                "stops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "color-hex"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "color"
+                        ],
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "format": "color-hex"
+                          },
+                          "alpha": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                          },
+                          "at": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Position 0–100 (%). In a split fill, where this band ends."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "The colour stops, in order. A bare hex is an opaque stop."
+                },
+                "blend": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "gradient"
+                  ],
+                  "description": "split = hard edges between the colours; gradient = blended (the default)."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "vertical",
+                        "horizontal",
+                        "diagonal",
+                        "diagonal-reverse"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                }
+              }
+            }
+          ],
+          "markdownDescription": "Multi-stop fill for the inner rows’ (files/folders inside) background — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.innerBackgroundColor#`; applies only while `#premiumExplorer.innerBackgroundStyle#` is `solid`. `#premiumExplorer.innerBackgroundOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays transparent and the theme shows through. A multi-stop fill is painted as a background image, so it does not brighten on hover (a solid fill still does). Edited in settings.json (objects have no Settings-UI editor)."
+        },
         "premiumExplorer.innerBackgroundOpacity": {
           "type": "number",
           "minimum": 0,
@@ -992,6 +1634,85 @@
           "default": "",
           "markdownDescription": "Color of the pill behind the label for the rows inside a colored folder. Empty falls back to the repo's hashed palette color for a `git` rule; a `manual` rule with no color here leaves this layer unpainted."
         },
+        "premiumExplorer.innerPillFill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "required": [
+                "stops"
+              ],
+              "properties": {
+                "stops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "color-hex"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "color"
+                        ],
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "format": "color-hex"
+                          },
+                          "alpha": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                          },
+                          "at": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Position 0–100 (%). In a split fill, where this band ends."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "The colour stops, in order. A bare hex is an opaque stop."
+                },
+                "blend": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "gradient"
+                  ],
+                  "description": "split = hard edges between the colours; gradient = blended (the default)."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "vertical",
+                        "horizontal",
+                        "diagonal",
+                        "diagonal-reverse"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                }
+              }
+            }
+          ],
+          "markdownDescription": "Multi-stop fill for the pill behind the inner rows (files/folders inside)’ label — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. Wins over `#premiumExplorer.innerPillColor#`; applies only while `#premiumExplorer.innerPill#` is `solid`. `#premiumExplorer.innerPillOpacity#` multiplies on each stop’s alpha, so an alpha-0 stop stays invisible and the row shows through. Edited in settings.json (objects have no Settings-UI editor)."
+        },
         "premiumExplorer.innerPillOpacity": {
           "type": "number",
           "minimum": 0,
@@ -1062,6 +1783,37 @@
           "minimum": 1,
           "default": 6,
           "markdownDescription": "Thickness in px of one diagonal stripe band on the inner rows (files/folders inside)'s edge bar."
+        },
+        "premiumExplorer.innerEdgeDirection": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "vertical",
+                "horizontal",
+                "diagonal",
+                "diagonal-reverse"
+              ]
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "default": "diagonal-reverse",
+          "markdownDescription": "Where the inner rows (files/folders inside)'s edge stripe runs. `diagonal-reverse` is the classic 45° stripe (bottom-left → top-right); `diagonal` slants the other way; `vertical` runs top → bottom (horizontally stacked bands); `horizontal` runs left → right. A number is a CSS gradient angle in degrees."
+        },
+        "premiumExplorer.innerEdgeBlend": {
+          "type": "string",
+          "enum": [
+            "bands",
+            "gradient"
+          ],
+          "enumDescriptions": [
+            "Hard-edged bands — the classic striped bar.",
+            "The colour sequence blended smoothly into each other."
+          ],
+          "default": "bands",
+          "markdownDescription": "How the inner rows (files/folders inside)'s edge colours are drawn: hard-edged bands, or the sequence blended into a gradient. Band thickness stays `#premiumExplorer.innerEdgeStripeSize#` either way."
         },
         "premiumExplorer.innerWatermarkStyle": {
           "type": "string",
@@ -1248,6 +2000,85 @@
           ],
           "default": "invert",
           "markdownDescription": "Background of the selected/focused Explorer row inside a colored folder.\n\n- `shift` — whatever the row already shows, lifted a step (`#premiumExplorer.selectedShift#`), so the selection reads as *this row, marked* instead of a foreign highlight. Carries its own strength, so `#premiumExplorer.selectedOpacity#` does not apply: compositing a shift back over the color it was measured from would cancel it out.\n- `invert` — the color that row is filled with (its `*BackgroundColor`, else the folder base), at `#premiumExplorer.selectedOpacity#`.\n- A hex such as `#ffffff`, at `#premiumExplorer.selectedOpacity#`.\n\nApplies only when `background` is listed in `#premiumExplorer.selectedOverrides#`."
+        },
+        "premiumExplorer.selectedBackgroundFill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "color-hex"
+            },
+            {
+              "type": "object",
+              "required": [
+                "stops"
+              ],
+              "properties": {
+                "stops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "color-hex"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "color"
+                        ],
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "format": "color-hex"
+                          },
+                          "alpha": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "The stop’s own alpha (0–1). Multiplies on any alpha the hex itself carries."
+                          },
+                          "at": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Position 0–100 (%). In a split fill, where this band ends."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "The colour stops, in order. A bare hex is an opaque stop."
+                },
+                "blend": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "gradient"
+                  ],
+                  "description": "split = hard edges between the colours; gradient = blended (the default)."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "vertical",
+                        "horizontal",
+                        "diagonal",
+                        "diagonal-reverse"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "description": "Where the fill runs; a number is a CSS gradient angle in degrees. Default horizontal (left → right)."
+                }
+              }
+            }
+          ],
+          "markdownDescription": "Multi-stop fill for the selected row — the shared Fill type (docs/fill-spec.md): a hex, or `{stops, blend?, direction?}` with each stop a hex or `{color, alpha?, at?}`. When set it wins over `#premiumExplorer.selectedBackgroundColor#` entirely; `#premiumExplorer.selectedOpacity#` multiplies on each stop’s alpha, `#premiumExplorer.selectedInactiveDarken#` darkens every stop while the Explorer is unfocused, and `#premiumExplorer.selectedBorder#` set to `auto` derives the ring from this fill (one step darker than its centre colour). Takes effect on the styles named in `#premiumExplorer.selectedOverrides#`, like every selection colour. Edited in settings.json (objects have no Settings-UI editor)."
         },
         "premiumExplorer.selectedShift": {
           "type": "number",

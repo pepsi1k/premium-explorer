@@ -16,7 +16,7 @@
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { HEX_RE, hashString, normalizePath } from './colors';
+import { Fill, FillDirection, HEX_RE, StripeBlend, hashString, normalizePath, parseFill } from './colors';
 
 export const CONFIG_SECTION = 'premiumExplorer';
 
@@ -63,6 +63,17 @@ const TEXT_STYLES: readonly TextStyle[] = ['none', 'bold', 'italic', 'bold-itali
 function parseLayerStyle(value: unknown): LayerStyle | undefined {
   return LAYER_STYLES.includes(value as LayerStyle) ? value as LayerStyle : undefined;
 }
+
+const FILL_DIRECTIONS: readonly string[] = ['vertical', 'horizontal', 'diagonal', 'diagonal-reverse'];
+function parseFillDirection(value: unknown): FillDirection | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return typeof value === 'string' && FILL_DIRECTIONS.includes(value) ? value as FillDirection : undefined;
+}
+function parseStripeBlend(value: unknown): StripeBlend | undefined {
+  return value === 'bands' || value === 'gradient' ? value : undefined;
+}
 function parseTextStyle(value: unknown): TextStyle | undefined {
   return TEXT_STYLES.includes(value as TextStyle) ? value as TextStyle : undefined;
 }
@@ -89,6 +100,12 @@ function hexArray(value: unknown): string[] {
 export interface PartConfig {
   backgroundStyle: LayerStyle;
   backgroundColor?: string;
+  /**
+   * Multi-stop fill for the row background (the shared `Fill` — see
+   * docs/fill-spec.md). Applies only while `backgroundStyle` is `solid`, and
+   * wins over `backgroundColor`.
+   */
+  backgroundFill?: Fill;
   backgroundOpacity: number;
   edge: LayerStyle;
   edgeColor?: string;
@@ -99,8 +116,21 @@ export interface PartConfig {
   edgeWidth: number;
   /** Thickness in px of one diagonal stripe band. */
   edgeStripeSize: number;
+  /**
+   * Where the bar's stripe runs (the shared Fill spelling): `diagonal-reverse`
+   * is the historical 45° stripe, `vertical` stacks the bands horizontally, a
+   * number is a CSS angle in degrees.
+   */
+  edgeDirection: FillDirection;
+  /** Hard `bands` (the historical look), or the sequence blended into a `gradient`. */
+  edgeBlend: StripeBlend;
   pill: LayerStyle;
   pillColor?: string;
+  /**
+   * Multi-stop fill for the pill (the shared `Fill` — see docs/fill-spec.md).
+   * Applies only while `pill` is `solid`, and wins over `pillColor`.
+   */
+  pillFill?: Fill;
   pillOpacity: number;
   pillRadius: number;
   textStyle: TextStyle;
@@ -160,14 +190,14 @@ function parseDimStyle(raw: unknown): WatermarkDimStyle | undefined {
 /** Global default parts, mirroring the defaults contributed in package.json. */
 const ROOT_DEFAULTS: PartConfig = {
   backgroundStyle: 'solid', backgroundOpacity: 0.5,
-  edge: 'none', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6,
+  edge: 'none', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
   pill: 'none', pillOpacity: 1, pillRadius: 6,
   textStyle: 'none',
   watermarkStyle: 'none', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };
 const INNER_DEFAULTS: PartConfig = {
   backgroundStyle: 'inherit', backgroundOpacity: 0.15,
-  edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6,
+  edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
   pill: 'inherit', pillOpacity: 1, pillRadius: 6,
   textStyle: 'none',
   watermarkStyle: 'inherit', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
@@ -204,6 +234,12 @@ export interface ResolvedRule {
 export interface SelectionConfig {
   /** `"shift"` (the row's own color, lifted), `"invert"` (the folder's color), or a hex. */
   background: string;
+  /**
+   * Multi-stop fill for the selection (the shared `Fill` — see
+   * docs/fill-spec.md). When set it wins over `background` entirely; the
+   * painter derives text/watermark/border off its ground.
+   */
+  fill?: Fill;
   /** 0..1 — how far `"shift"` lifts the row's own color off itself. */
   shift: number;
   /** `"auto"` (contrast) or a hex text color. */
@@ -262,6 +298,7 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
   return {
     backgroundStyle: parseLayerStyle(get(`${prefix}BackgroundStyle`)) ?? defaults.backgroundStyle,
     backgroundColor: hexOrUndefined(get(`${prefix}BackgroundColor`)),
+    backgroundFill: parseFill(get(`${prefix}BackgroundFill`)),
     backgroundOpacity: numberOrUndefined(get(`${prefix}BackgroundOpacity`)) ?? defaults.backgroundOpacity,
     edge: parseLayerStyle(get(`${prefix}Edge`)) ?? defaults.edge,
     edgeColor: hexOrUndefined(get(`${prefix}EdgeColor`)),
@@ -269,8 +306,11 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
     edgeColors: hexArray(get(`${prefix}EdgeColors`)),
     edgeWidth: numberOrUndefined(get(`${prefix}EdgeWidth`)) ?? defaults.edgeWidth,
     edgeStripeSize: numberOrUndefined(get(`${prefix}EdgeStripeSize`)) ?? defaults.edgeStripeSize,
+    edgeDirection: parseFillDirection(get(`${prefix}EdgeDirection`)) ?? defaults.edgeDirection,
+    edgeBlend: parseStripeBlend(get(`${prefix}EdgeBlend`)) ?? defaults.edgeBlend,
     pill: parseLayerStyle(get(`${prefix}Pill`)) ?? defaults.pill,
     pillColor: hexOrUndefined(get(`${prefix}PillColor`)),
+    pillFill: parseFill(get(`${prefix}PillFill`)),
     pillOpacity: numberOrUndefined(get(`${prefix}PillOpacity`)) ?? defaults.pillOpacity,
     pillRadius: numberOrUndefined(get(`${prefix}PillRadius`)) ?? defaults.pillRadius,
     textStyle: parseTextStyle(get(`${prefix}TextStyle`)) ?? defaults.textStyle,
@@ -298,6 +338,8 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (backgroundStyle) { o.backgroundStyle = backgroundStyle; }
   const backgroundColor = hexOrUndefined(entry[`${prefix}BackgroundColor`]);
   if (backgroundColor) { o.backgroundColor = backgroundColor; }
+  const backgroundFill = parseFill(entry[`${prefix}BackgroundFill`]);
+  if (backgroundFill !== undefined) { o.backgroundFill = backgroundFill; }
   const backgroundOpacity = numberOrUndefined(entry[`${prefix}BackgroundOpacity`]);
   if (backgroundOpacity !== undefined) { o.backgroundOpacity = backgroundOpacity; }
   const edge = parseLayerStyle(entry[`${prefix}Edge`]);
@@ -312,6 +354,10 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (edgeWidth !== undefined) { o.edgeWidth = edgeWidth; }
   const edgeStripeSize = numberOrUndefined(entry[`${prefix}EdgeStripeSize`]);
   if (edgeStripeSize !== undefined) { o.edgeStripeSize = edgeStripeSize; }
+  const edgeDirection = parseFillDirection(entry[`${prefix}EdgeDirection`]);
+  if (edgeDirection !== undefined) { o.edgeDirection = edgeDirection; }
+  const edgeBlend = parseStripeBlend(entry[`${prefix}EdgeBlend`]);
+  if (edgeBlend) { o.edgeBlend = edgeBlend; }
   const watermarkStyle = parseLayerStyle(entry[`${prefix}WatermarkStyle`]);
   if (watermarkStyle) { o.watermarkStyle = watermarkStyle; }
   const watermarkColor = watermarkColorOrUndefined(entry[`${prefix}WatermarkColor`]);
@@ -342,6 +388,8 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (pill) { o.pill = pill; }
   const pillColor = hexOrUndefined(entry[`${prefix}PillColor`]);
   if (pillColor) { o.pillColor = pillColor; }
+  const pillFill = parseFill(entry[`${prefix}PillFill`]);
+  if (pillFill !== undefined) { o.pillFill = pillFill; }
   const pillOpacity = numberOrUndefined(entry[`${prefix}PillOpacity`]);
   if (pillOpacity !== undefined) { o.pillOpacity = pillOpacity; }
   const pillRadius = numberOrUndefined(entry[`${prefix}PillRadius`]);
@@ -376,6 +424,7 @@ export function readConfig(): FolderColorerConfig {
     inner: readPart(get, 'inner', INNER_DEFAULTS),
     selection: {
       background: cfg.get<string>('selectedBackgroundColor', 'invert'),
+      fill: parseFill(cfg.get('selectedBackgroundFill')),
       shift: cfg.get<number>('selectedShift', 0.12),
       text: cfg.get<string>('selectedTextColor', 'auto'),
       opacity: cfg.get<number>('selectedOpacity', 1),

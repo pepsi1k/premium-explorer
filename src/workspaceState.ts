@@ -11,6 +11,7 @@ import * as path from 'path';
 import { ColoredFolder } from './layers';
 import { FolderColorerConfig } from './config';
 import { FolderColors, isWithin } from './coloredFolders';
+import { Fill, mixHex, resolveFill, splitHexAlpha } from './colors';
 
 // The injected file is a single global file shared by every window, but rules are
 // per-workspace. We persist a union of each workspace's colored folders (keyed by
@@ -31,11 +32,54 @@ const WORKSPACE_SELECTION_STATE = 'premiumExplorer.workspaceSelection';
  */
 export type WorkspaceColors = Record<string, Record<string, FolderColors>>;
 
+/**
+ * A `selectedBackgroundFill`, baked for the painter: the focused and the
+ * inactive (each stop darkened by `selectedInactiveDarken`) variants, plus the
+ * fill's ground — the color at the row's centre — for every derivation that
+ * needs "the selection's color" (text contrast, auto watermark, auto border).
+ */
+export interface SelectionFill {
+  /** `rgba(...)` or `linear-gradient(...)`, `selectedOpacity` baked in. */
+  value: string;
+  /** True when `value` (and `inactive`) are gradient images, not colors. */
+  image: boolean;
+  /** Ground hex + alpha; the painter composites them over the live backdrop. */
+  ground: string;
+  groundAlpha: number;
+  inactive: string;
+  inactiveGround: string;
+}
+
 /** One workspace's selection settings, as the painter reads them. */
 export interface SelectionOptions {
   bg: string; shift: number; text: string; opacity: number; border: string;
   inactiveDarken: number; overrides: string[]; watermark: string;
   watermarkContrast: number; bold: boolean;
+  /** Set only when `selectedBackgroundFill` is configured; wins over `bg`. */
+  fill?: SelectionFill;
+}
+
+/** Every stop stepped toward black — the unfocused variant of a selection fill. */
+function darkenFill(fill: Fill, amount: number): Fill {
+  if (typeof fill === 'string') {
+    const { hex, alpha } = splitHexAlpha(fill);
+    return { stops: [{ color: mixHex(hex, '#000000', amount), alpha }], blend: 'gradient', direction: 'horizontal' };
+  }
+  return { ...fill, stops: fill.stops.map(s => ({ ...s, color: mixHex(s.color, '#000000', amount) })) };
+}
+
+/** Bake a `selectedBackgroundFill` into what the painter applies (see {@link SelectionFill}). */
+function bakeSelectionFill(fill: Fill, opacity: number, inactiveDarken: number): SelectionFill {
+  const normal = resolveFill(fill, opacity);
+  const inactive = resolveFill(darkenFill(fill, inactiveDarken), opacity);
+  return {
+    value: normal.color || normal.image,
+    image: !!normal.image,
+    ground: normal.hex,
+    groundAlpha: normal.alpha,
+    inactive: inactive.color || inactive.image,
+    inactiveGround: inactive.hex,
+  };
 }
 
 /** Persisted union: workspace-folder name (lowercased) -> that workspace's selection. */
@@ -128,6 +172,7 @@ export function buildSelection(config: FolderColorerConfig): SelectionOptions {
     watermark: s.watermark,
     watermarkContrast: s.watermarkContrast,
     bold: s.bold,
+    ...(s.fill !== undefined ? { fill: bakeSelectionFill(s.fill, s.opacity, s.inactiveDarken) } : {}),
   };
 }
 

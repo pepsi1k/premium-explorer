@@ -84,7 +84,9 @@ export function buildCss(): string {
   const hoverCss =
     '\n/* Hover brightening: applied by CSS so mouse moves never repaint. */\n' +
     `${hoverRow}.fc-hover-bg:hover {\n\tbackground-color: var(--fc-bg-hover) !important;\n}\n` +
-    `${hoverRow}.fc-hover-pill:hover .label-name {\n\tbackground-color: var(--fc-pill-hover) !important;\n}\n`;
+    // `background`, not `background-color`: a pill fill may be a baked gradient
+    // string, and its hover variant is one too — the shorthand takes both.
+    `${hoverRow}.fc-hover-pill:hover .label-name {\n\tbackground: var(--fc-pill-hover) !important;\n}\n`;
 
   // A selected row whose pill kept its own fill keeps its own label text too
   // (`.fc-pill-own`, set by the painter): the selection text color is picked

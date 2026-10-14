@@ -33,6 +33,29 @@ function toRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
+/**
+ * Split a hex into its opaque 6-digit form and its own alpha channel
+ * (`#rrggbbaa` carries one; everything else is opaque).
+ */
+export function splitHexAlpha(hex: string): { hex: string; alpha: number } {
+  let h = hex.replace('#', '');
+  if (h.length === 3) {
+    h = h.split('').map(c => c + c).join('');
+  }
+  const alpha = h.length === 8 ? Math.round((parseInt(h.slice(6, 8), 16) / 255) * 1000) / 1000 : 1;
+  return { hex: '#' + h.slice(0, 6).toLowerCase(), alpha };
+}
+
+/** Mix two hex colors: `t` = 0 gives `a`, 1 gives `b`. */
+export function mixHex(a: string, b: string, t: number): string {
+  const ca = toRgb(a);
+  const cb = toRgb(b);
+  const f = clamp01(t);
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * f);
+  return '#' + [mix(ca.r, cb.r), mix(ca.g, cb.g), mix(ca.b, cb.b)]
+    .map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 /** Convert a hex color plus an alpha (0-1) into a CSS `rgba(...)` string. */
 export function hexToRgba(hex: string, alpha: number): string {
   const { r, g, b } = toRgb(hex);
@@ -90,11 +113,22 @@ export function paletteSequence(basis: string, palette: string[], count: number,
   return out;
 }
 
+/** How the edge bar's colour sequence is drawn: hard bands, or blended into each other. */
+export type StripeBlend = 'bands' | 'gradient';
+
 /**
- * The 45° repeating stripe used by the `edge` layer. One colour degrades to a
+ * The repeating stripe used by the `edge` layer. One colour degrades to a
  * plain solid bar, which is exactly what the old box-shadow edge looked like.
+ * `direction` follows the shared Fill spelling (`diagonal-reverse` = the
+ * historical 45° stripe); `gradient` blends the sequence instead of cutting
+ * hard bands, wrapping back to the first colour so the repeat stays seamless.
  */
-export function stripeGradient(colors: string[], band: number): string {
+export function stripeGradient(
+  colors: string[],
+  band: number,
+  direction: FillDirection = 'diagonal-reverse',
+  blend: StripeBlend = 'bands',
+): string {
   if (colors.length === 0) {
     return '';
   }
@@ -102,10 +136,241 @@ export function stripeGradient(colors: string[], band: number): string {
     return `linear-gradient(${colors[0]},${colors[0]})`;
   }
   const width = Math.max(1, Math.round(band));
+  const angle = fillAngle(direction);
+  if (blend === 'gradient') {
+    const loop = [...colors, colors[0]];
+    const stops = loop.map((c, i) => `${c} ${i * width}px`).join(',');
+    return `repeating-linear-gradient(${angle},${stops})`;
+  }
   const stops = colors
     .map((c, i) => `${c} ${i * width}px ${(i + 1) * width}px`)
     .join(',');
-  return `repeating-linear-gradient(45deg,${stops})`;
+  return `repeating-linear-gradient(${angle},${stops})`;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Multi-stop fills (the shared `Fill` type — see docs/fill-spec.md)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Where a fill runs. The names map to CSS gradient angles:
+ * `vertical` 180° (top → bottom), `horizontal` 90° (left → right),
+ * `diagonal` 135° (top-left → bottom-right), `diagonal-reverse` 45°
+ * (bottom-left → top-right). A number is a CSS angle in degrees.
+ */
+export type FillDirection = 'vertical' | 'horizontal' | 'diagonal' | 'diagonal-reverse' | number;
+
+/** One normalized stop: an opaque hex, its own alpha (0–1), and its position (0–100). */
+export interface FillStop {
+  color: string;
+  alpha: number;
+  /**
+   * `gradient` blend: the stop's position. `split` blend: where this stop's hard
+   * band *ends*. Omitted positions are distributed (see {@link normalizedStops}).
+   */
+  at?: number;
+}
+
+/** A multi-stop fill, as validated by {@link parseFill}. */
+export interface FillSpec {
+  stops: FillStop[];
+  /** `split` = hard edges between the colors; `gradient` = blended. */
+  blend: 'split' | 'gradient';
+  direction: FillDirection;
+}
+
+/**
+ * The shared fill vocabulary: a plain hex (alpha-carrying `#rrggbbaa` allowed),
+ * or a stop list. Settings carry the raw user value; `parseFill` is the one
+ * place that turns it into this.
+ */
+export type Fill = string | FillSpec;
+
+const FILL_DIRECTIONS: readonly string[] = ['vertical', 'horizontal', 'diagonal', 'diagonal-reverse'];
+
+/** One raw stop from settings into a {@link FillStop}, or undefined if unusable. */
+function parseFillStop(raw: unknown): FillStop | undefined {
+  if (typeof raw === 'string') {
+    if (!HEX_RE.test(raw)) {
+      return undefined;
+    }
+    const { hex, alpha } = splitHexAlpha(raw);
+    return { color: hex, alpha };
+  }
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+  const o = raw as Record<string, unknown>;
+  if (typeof o.color !== 'string' || !HEX_RE.test(o.color)) {
+    return undefined;
+  }
+  const { hex, alpha: hexAlpha } = splitHexAlpha(o.color);
+  // An explicit `alpha` multiplies on whatever the hex itself carries.
+  const alpha = typeof o.alpha === 'number' ? clamp01(o.alpha) * hexAlpha : hexAlpha;
+  const at = typeof o.at === 'number' ? Math.max(0, Math.min(100, o.at)) : undefined;
+  return { color: hex, alpha, at };
+}
+
+/**
+ * Validate a raw settings value into a {@link Fill}. A hex string passes
+ * through; an object needs a non-empty `stops` list (invalid entries make the
+ * whole fill invalid — a half-read gradient would paint something the user
+ * never wrote). Anything else is undefined, i.e. "no fill set".
+ */
+export function parseFill(raw: unknown): Fill | undefined {
+  if (typeof raw === 'string') {
+    return HEX_RE.test(raw) ? raw : undefined;
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const o = raw as Record<string, unknown>;
+  if (!Array.isArray(o.stops) || o.stops.length === 0) {
+    return undefined;
+  }
+  const stops: FillStop[] = [];
+  for (const s of o.stops) {
+    const stop = parseFillStop(s);
+    if (!stop) {
+      return undefined;
+    }
+    stops.push(stop);
+  }
+  const blend = o.blend === 'split' || o.blend === 'gradient' ? o.blend : 'gradient';
+  const direction: FillDirection =
+    typeof o.direction === 'number' && Number.isFinite(o.direction) ? o.direction
+      : typeof o.direction === 'string' && FILL_DIRECTIONS.includes(o.direction) ? o.direction as FillDirection
+        : 'horizontal';
+  return { stops, blend, direction };
+}
+
+/** A fill resolved to ready-to-apply CSS (see docs/fill-spec.md for the contract). */
+export interface ResolvedFill {
+  /** `rgba(...)` when the fill collapses to one color — goes where a solid goes today. */
+  color: string;
+  /** `linear-gradient(...)` when it doesn't — the bottom-most background image. */
+  image: string;
+  /** The fill's *ground*: its opaque hex at the element's centre (t = 50%). */
+  hex: string;
+  /** The ground's alpha, after the layer opacity multiplier. */
+  alpha: number;
+}
+
+/** CSS angle for a {@link FillDirection}. */
+function fillAngle(direction: FillDirection): string {
+  if (typeof direction === 'number') {
+    return `${Math.round(direction * 100) / 100}deg`;
+  }
+  switch (direction) {
+    case 'vertical': return '180deg';
+    case 'horizontal': return '90deg';
+    case 'diagonal': return '135deg';
+    default: return '45deg';   // diagonal-reverse
+  }
+}
+
+/**
+ * Concrete positions for every stop. `gradient`: explicit `at`s anchor, the
+ * first/last default to 0/100, gaps spread evenly between anchors (what CSS
+ * itself would do) — made explicit so the ground can be computed. `split`: `at`
+ * is where a band ends; missing ends divide the remaining run equally. Both are
+ * clamped monotonic so an out-of-order list degrades instead of flipping.
+ */
+function normalizedStops(stops: FillStop[], blend: 'split' | 'gradient'): { color: string; alpha: number; at: number }[] {
+  const n = stops.length;
+  const out = stops.map(s => ({ color: s.color, alpha: s.alpha, at: s.at }));
+  if (blend === 'split') {
+    let prev = 0;
+    for (let i = 0; i < n; i++) {
+      const fallback = prev + (100 - prev) / (n - i);
+      const at = i === n - 1 ? 100 : Math.max(prev, out[i].at ?? fallback);
+      out[i].at = at;
+      prev = at;
+    }
+  } else {
+    out[0].at = out[0].at ?? 0;
+    out[n - 1].at = out[n - 1].at ?? 100;
+    let anchor = 0;
+    for (let i = 1; i < n; i++) {
+      if (out[i].at === undefined) {
+        continue;
+      }
+      const gap = i - anchor;
+      const from = out[anchor].at as number;
+      const to = Math.max(from, out[i].at as number);
+      out[i].at = to;
+      for (let k = 1; k < gap; k++) {
+        out[anchor + k].at = from + ((to - from) * k) / gap;
+      }
+      anchor = i;
+    }
+  }
+  return out as { color: string; alpha: number; at: number }[];
+}
+
+/**
+ * THE fill resolver — every layer that takes a `Fill` goes through here, so a
+ * gradient means the same thing on a background, a pill, a selection or the
+ * edge bar. `opacity` multiplies each stop's alpha (the layer's `*Opacity`
+ * setting); `lighten`/`alphaBoost` bake a hover variant the same way solids
+ * brighten today (each stop lifted toward white, alpha nudged up).
+ */
+export function resolveFill(fill: Fill, opacity = 1, lighten = 0, alphaBoost = 0): ResolvedFill {
+  const spec: FillSpec = typeof fill === 'string'
+    ? (({ hex, alpha }) => ({ stops: [{ color: hex, alpha }], blend: 'gradient' as const, direction: 'horizontal' as const }))(splitHexAlpha(fill))
+    : fill;
+  const stops = normalizedStops(spec.stops, spec.blend).map(s => ({
+    color: lighten > 0 ? lightenHex(s.color, lighten) : s.color,
+    // An alpha-0 stop is a shape choice (a fade-in's invisible edge), so a hover
+    // boost never surfaces it — only stops that already show brighten.
+    alpha: s.alpha > 0 ? clamp01(clamp01(s.alpha * opacity) + alphaBoost) : 0,
+    at: s.at,
+  }));
+
+  // The ground: what the fill shows at the element's centre. Everything that
+  // assumes "the row's color" (shift/invert, watermarkContrast, flatten in the
+  // painter) reads this instead of guessing at a gradient.
+  let hex = stops[0].color;
+  let alpha = stops[0].alpha;
+  if (stops.length > 1) {
+    if (spec.blend === 'split') {
+      const seg = stops.find(s => s.at > 50) ?? stops[stops.length - 1];
+      hex = seg.color;
+      alpha = seg.alpha;
+    } else {
+      let lo = stops[0];
+      let hi = stops[stops.length - 1];
+      for (const s of stops) {
+        if (s.at <= 50) { lo = s; }
+      }
+      for (let i = stops.length - 1; i >= 0; i--) {
+        if (stops[i].at >= 50) { hi = stops[i]; }
+      }
+      const span = hi.at - lo.at;
+      const t = span > 0 ? (50 - lo.at) / span : 0;
+      hex = mixHex(lo.color, hi.color, t);
+      alpha = lo.alpha + (hi.alpha - lo.alpha) * t;
+    }
+  }
+  alpha = Math.round(alpha * 1000) / 1000;
+
+  if (stops.length === 1) {
+    return { color: hexToRgba(stops[0].color, stops[0].alpha), image: '', hex, alpha };
+  }
+  const angle = fillAngle(spec.direction);
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  let body: string;
+  if (spec.blend === 'split') {
+    let prev = 0;
+    body = stops.map(s => {
+      const piece = `${hexToRgba(s.color, s.alpha)} ${r1(prev)}% ${r1(s.at)}%`;
+      prev = s.at;
+      return piece;
+    }).join(',');
+  } else {
+    body = stops.map(s => `${hexToRgba(s.color, s.alpha)} ${r1(s.at)}%`).join(',');
+  }
+  return { color: '', image: `linear-gradient(${angle},${body})`, hex, alpha };
 }
 
 /** Escape the few characters that would break out of an SVG text node. */

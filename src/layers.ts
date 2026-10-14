@@ -9,7 +9,7 @@
  * and reuses it wholesale, falling back to the shipped default when nothing
  * encloses the folder (see NO_ANCESTOR_FALLBACK).
  */
-import { WatermarkArt, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
+import { Fill, WatermarkArt, resolveFill, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
 import { WATERMARK_COLOR_ORIGINAL, LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig } from './config';
 
 /** A colored folder: its base color, its source path, and its resolved root/inner layers. */
@@ -33,6 +33,12 @@ const HOVER_OPACITY_BOOST = 0.15;
 export interface Layer {
   value: string;
   hover: string;
+  /**
+   * Set only when `value` is a gradient image: the fill's ground (its color at
+   * the element's centre) as an `rgba(...)`, for everything in the painter that
+   * composites "the row's color" and cannot parse a gradient string.
+   */
+  ground?: string;
 }
 
 /**
@@ -109,6 +115,7 @@ export function buildLayer(
   baseHex: string,
   inherited: Layer | undefined,
   fallback: LayerStyle,
+  fill?: Fill,
 ): Layer {
   let effective = style;
   if (effective === 'inherit') {
@@ -119,6 +126,18 @@ export function buildLayer(
   }
   if (effective !== 'solid') {
     return { value: '', hover: '' };
+  }
+  // A multi-stop fill wins over the single color. `value` is then either an
+  // `rgba(...)` (one stop) or a `linear-gradient(...)` string — the painter
+  // applies both through the `background` shorthand, so it never cares which.
+  if (fill !== undefined) {
+    const normal = resolveFill(fill, opacity);
+    const hover = resolveFill(fill, opacity, HOVER_LIGHTEN, HOVER_OPACITY_BOOST);
+    return {
+      value: normal.color || normal.image,
+      hover: hover.color || hover.image,
+      ...(normal.image ? { ground: hexToRgba(normal.hex, normal.alpha) } : {}),
+    };
   }
   const hex = color ?? baseHex;
   if (!hex) {
@@ -156,7 +175,7 @@ export function buildStripe(p: PartConfig, sequence: string[], inherited: Stripe
     return { image: '', width: 0 };
   }
   return {
-    image: stripeGradient(colors.map(c => hexToRgba(c, p.edgeOpacity)), p.edgeStripeSize),
+    image: stripeGradient(colors.map(c => hexToRgba(c, p.edgeOpacity)), p.edgeStripeSize, p.edgeDirection, p.edgeBlend),
     width: Math.max(1, Math.round(p.edgeWidth)),
   };
 }
@@ -229,12 +248,18 @@ export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Par
   // come from there too — falling back to this folder's own base would misreport
   // a row painted in its parent's color (a manual rule has no base at all), and
   // every shade derived from it would be wrong with it.
-  const fillHex = p.backgroundColor
+  // A multi-stop fill's "color" is its ground — the hex at the row's centre
+  // (docs/fill-spec.md) — so shift/invert/watermark all derive off what the eye
+  // actually sees behind the label.
+  const fillHex = (p.backgroundStyle === 'solid' && p.backgroundFill !== undefined
+    ? resolveFill(p.backgroundFill).hex
+    : undefined)
+    ?? p.backgroundColor
     ?? (p.backgroundStyle === 'inherit' && inheritFrom ? inheritFrom.solid : baseHex);
   return {
-    background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background),
+    background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background, p.backgroundFill),
     edge: buildStripe(p, folder.sequence, inheritFrom?.edge),
-    pill: buildLayer(p.pill, p.pillColor, p.pillOpacity, baseHex, inheritFrom?.pill, NO_ANCESTOR_FALLBACK.pill),
+    pill: buildLayer(p.pill, p.pillColor, p.pillOpacity, baseHex, inheritFrom?.pill, NO_ANCESTOR_FALLBACK.pill, p.pillFill),
     pillRadius: p.pillRadius,
     text: p.textColor ?? '',
     bold: p.textStyle === 'bold' || p.textStyle === 'bold-italic',

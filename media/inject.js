@@ -28,7 +28,7 @@
 	// with it every selection on a row outside a coloured folder, since "invert" has
 	// no colour to use there. `paint()` picks this window's before it paints a row.
 	var SELECTIONS;
-	var SEL;         // { bg, text, opacity, border, inactiveDarken, overrides, bold }
+	var SEL;         // { bg, text, opacity, border, inactiveDarken, overrides, bold, fill? }
 
 	// How far a row being renamed shifts off the color it would otherwise paint —
 	// enough to register as a change, not enough to look like a different folder.
@@ -44,10 +44,16 @@
 
 	// The focus ring for a selected row while the Explorer is focused:
 	//   "none" -> no ring; "auto" -> the theme's own focus-outline color; hex -> that color.
-	function selectionOutline() {
+	// With a `selectedBackgroundFill`, "auto" instead derives from the fill itself —
+	// one step darker than its ground (§5: light fill → darker border, dark fill →
+	// darker still) — so the ring always belongs to the selection it wraps.
+	function selectionOutline(fillBase) {
 		var b = SEL.border;
 		if (!b || b === "none") { return ""; }
-		if (b === "auto") { return "1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder, rgba(0, 0, 0, 0.4)))"; }
+		if (b === "auto") {
+			if (fillBase) { return "1px solid " + darken(fillBase, 0.3); }
+			return "1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder, rgba(0, 0, 0, 0.4)))";
+		}
 		return "1px solid " + b;
 	}
 
@@ -383,6 +389,8 @@
 	// A rounded background behind just the label text, for the `pill` layer.
 	// `outlineColor` traces the pill's edge; it is drawn as an inset outline rather
 	// than a border so switching it on never reflows the label by a pixel.
+	// `value` is an rgba color or a baked gradient string — the `background`
+	// shorthand takes both, which is what lets a pill carry a multi-stop fill.
 	function setLabelBg(row, value, radius, outlineColor) {
 		var key = value ? value + "|" + radius + "|" + (outlineColor || "") : "";
 		if ((row.dataset.fcPill || "") === key) { return; }
@@ -390,7 +398,7 @@
 		var names = row.querySelectorAll(".label-name");
 		for (var i = 0; i < names.length; i++) {
 			var s = names[i].style;
-			s.backgroundColor = value;
+			s.background = value;
 			s.borderRadius = value ? radius + "px" : "";
 			s.padding = value ? "0 5px" : "";
 			s.outline = value && outlineColor ? "1px solid " + outlineColor : "";
@@ -669,7 +677,10 @@
 			// Every "a shade off what is already there" color — the shifted selection,
 			// the rename fill, the watermark tint — is measured from this, so they all
 			// land relative to the same thing the eye is comparing against.
-			var rowShows = flatten(part && part.background.value ? part.background.value : backdrop, backdrop);
+			// A gradient fill cannot be composited as a color, so it ships its ground —
+			// the color at the row's centre — in `background.ground` (see fill-spec).
+			var rowShows = flatten(part && part.background.value
+				? (part.background.ground || part.background.value) : backdrop, backdrop);
 
 			// Only the actually-selected row(s) — not a stale `.focused` row left behind
 			// when focus moved to the editor — and only in a configured workspace.
@@ -678,12 +689,18 @@
 			// reads as "this row, marked" instead of a foreign highlight; "invert" uses
 			// the folder's own color at full strength; a hex applies to every row.
 			// Focused: full color. Unfocused: darker, like VS Code's inactive selection.
-			var shifting = SEL.bg === "shift";
+			// A baked `selectedBackgroundFill` (SEL.fill) wins over all of those: its
+			// variants carry opacity and the inactive darken already, and its base is
+			// its ground composited over the backdrop — the color the eye actually sees.
+			var F = SEL.fill || null;
+			var shifting = !F && SEL.bg === "shift";
 			var selBase = !selected ? null
+				: F ? mix(focused ? F.ground : F.inactiveGround, backdrop, F.groundAlpha)
 				: shifting ? lift(rowShows, part ? part.solid : "", focused ? SEL.shift : SEL.shift * 0.45)
 				: SEL.bg === "invert" ? (part ? part.solid : null)
 				: SEL.bg;
 			var selFill = !selBase ? ""
+				: F ? (focused ? F.value : F.inactive)
 				// A shift is measured against what the row already shows, so painting it
 				// back at partial alpha composites it over that very color and cancels
 				// itself out. It carries its own strength instead, and dims by shifting
@@ -704,7 +721,8 @@
 			// bright selection it lands far too dark.
 			var rowPaint = !selBase ? ""
 				: !overridden("background") ? (part ? part.solid : selBase)
-				: shifting ? selBase
+				// A fill's base is already composited over the backdrop; a shift is too.
+				: (F || shifting) ? selBase
 				: mix(selBase, backdrop, SEL.opacity);
 			var selWatermark = selBase ? (SEL.watermark === "auto" ? nudge(rowPaint, rowPaint, SEL.watermarkContrast) : SEL.watermark) : "";
 			// The unselected watermark's own tint, when no watermarkColor pinned it. It is
@@ -738,12 +756,25 @@
 			// painted here: it travels as `--fc-bg-hover`/`--fc-pill-hover` custom
 			// properties (see setHoverVars) and the generated CSS's `:hover` rules do
 			// the swap — so a mouse move never costs a repaint (EM-85).
+			var bgGradient = "";   // the row's fill when it is a gradient image
+			var groundShows = ""; // the color standing in for that gradient when compositing
 			if (part) {
 				// What the row is filled with at this moment — its own fill, or the
 				// selection when that takes the background over. The cover below has to
-				// paint this exact color to stay invisible against it.
-				if (part.background.value) { background = part.background.value; }
-				if (taken("background")) { background = selFill; }
+				// paint this exact color to stay invisible against it. A gradient fill
+				// is a background *image* (the bottom of the stack, pushed last), so the
+				// color slot stays empty and the ground stands in wherever a color is
+				// composited.
+				if (part.background.value) {
+					if (part.background.ground) {
+						bgGradient = part.background.value;
+						groundShows = part.background.ground;
+					} else { background = part.background.value; }
+				}
+				if (taken("background")) {
+					if (F && F.image) { bgGradient = selFill; groundShows = selBase; background = ""; }
+					else { background = selFill; bgGradient = ""; groundShows = ""; }
+				}
 				if (part.edge.image) {
 					layers.push({
 						// The bar always keeps its own colours — selected, renaming and
@@ -764,7 +795,8 @@
 					// and under the edge bar, which sits in pixels no label reaches.
 					var discs = part.watermark.textDim > 0 && !editing
 						? watermarkCover(part.watermark, phase, ends, i, heights[i],
-							flatten(background || backdrop, backdrop), part.watermark.textDim)
+							flatten(background || groundShows || backdrop, backdrop),
+							part.watermark.textDim)
 						: null;
 					if (discs) { layers.push(discs); }
 					var wmTint = taken("watermarks") ? selWatermark : autoWatermark;
@@ -787,14 +819,31 @@
 					if (selFill && !taken("pills")) { labelOutline = selText; }
 				}
 			}
-
 			// The selection fill is not one of the folder's layers. A fixed colour — a
-			// hex, or a "shift" measured off the theme — applies to every selected row in
-			// a configured workspace, rows outside any coloured folder included, which is
-			// what "a hex applies the same colour everywhere" has always promised. Inside
-			// a folder this is already done above, before the watermark cover reads it.
-			// ("invert" has no colour to use without a folder, so it leaves the row alone.)
-			if (!part && taken("background")) { background = selFill; }
+			// hex, a Fill, or a "shift" measured off the theme — applies to every
+			// selected row in a configured workspace, rows outside any coloured folder
+			// included, which is what "a hex applies the same colour everywhere" has
+			// always promised. Inside a folder this is already done above, before the
+			// watermark cover reads it. ("invert" has no colour without a folder, so it
+			// leaves the row alone.)
+			if (!part && taken("background")) {
+				if (F && F.image) { bgGradient = selFill; groundShows = selBase; }
+				else { background = selFill; }
+			}
+
+			// The gradient fill goes in last — the bottom of the stack, under the edge
+			// bar, the cover and the watermark, exactly where the background color sits
+			// for a solid fill. Not while renaming: the rename shift below paints a
+			// lifted *color*, and the gradient image would sit on top of it — the
+			// lifted ground stands in for the fill until the box closes.
+			if (bgGradient && !editing) {
+				layers.push({
+					image: bgGradient,
+					size: "100% 100%",
+					repeat: "no-repeat",
+					position: "left top"
+				});
+			}
 
 			// Mark the rows we actually paint a selection on, so the generated CSS can
 			// colour exactly those labels and no others. Without it the label rule fires
@@ -807,7 +856,7 @@
 			// a row being renamed, whose text is the input's.
 			var selLabel = taken("text-color") ? selText : "";
 			// The focus ring is its own setting, not one of the taken-over styles.
-			if (selected && selFill && focused) { outline = selectionOutline(); }
+			if (selected && selFill && focused) { outline = selectionOutline(F ? selBase : ""); }
 
 			// The row keeps its own fill, edge and watermark while the box is open:
 			// blanking them punches a bare hole into the middle of the folder block, and
