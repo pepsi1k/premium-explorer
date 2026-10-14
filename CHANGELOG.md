@@ -3,6 +3,22 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.3.2] - 2026-10-14
+
+### Fixed
+- **Colours no longer trail the rows while scrolling.** The Explorer reuses its
+  rows as you scroll, and the painter held a fixed 80ms between repaints, so a
+  reused row kept the previous row's fill, edge bar and pill for several frames
+  — the wobble, the stray edge slivers and the bare rows at the bottom edge.
+  Repainting now keeps pace with the list itself, measured at 4–12ms instead of
+  57–71ms. Heavy workspaces still fall back to the old pace rather than
+  competing with the editor for the main thread.
+- **A pill could disappear for good.** When the Explorer re-rendered a row's
+  label it dropped the pill, text colour and weight we had applied, while the
+  painter still recorded them as applied — so they were never put back until
+  something else about the row changed. The record now lives in the styling
+  itself, so a re-rendered label is always repainted.
+
 ## [2.3.1] - 2026-10-14
 
 ### Fixed

@@ -206,6 +206,19 @@ function stopCount(image) {
     'EM-85 hover is CSS-only');
   check(css.includes('.fc-sel-text.fc-pill-own .label-name'),
     'EM-89 selection text colour spares a kept pill');
+  // EM-101: a label's change-tracking key has to live in the inline style it
+  // guards, so a re-rendered label (which drops that style) is repainted rather
+  // than skipped for ever.
+  // `fcPillOwn` is a row-level marker for a row-level write, so it stays.
+  check(js.includes('--fc-pill-key') && js.includes('--fc-text-key') && js.includes('--fc-ts-key')
+    && !/dataset\.fcPill\b(?!Own)/.test(js) && !/dataset\.fcTextStyle\b/.test(js),
+    'EM-101 label styles are keyed inside the style they guard, not on the row');
+  // EM-100: keep up with the list frame by frame while paints are cheap, and
+  // repaint on scroll rather than waiting out a fixed throttle.
+  check(js.includes('lastCost <= BUDGET_MS') && js.includes('requestAnimationFrame'),
+    'EM-100 cheap paints are scheduled per animation frame');
+  check(js.includes('addEventListener("scroll"') && js.includes('passive: true'),
+    'EM-100 scrolling schedules a repaint');
   const reg = at('regression/inner-none');
   check(reg.root.background.value !== '' && reg.inner.background.value === '',
     'EM-83 innerBackgroundStyle "none" leaves inner rows unpainted');

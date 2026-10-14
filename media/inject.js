@@ -243,12 +243,25 @@
 		row.style.backgroundColor = value;
 	}
 
+	// The label-level writes below keep their change-tracking key *inside the very
+	// inline style it guards*, as a custom property, rather than in a `data-`
+	// marker on the row.
+	//
+	// The tree owns `.label-name`: it re-renders one whenever the label changes —
+	// a recycled row, a git decoration — and that drops the inline styles we put
+	// there. A marker kept anywhere else survives that and goes on claiming the
+	// styling is applied, so the pill or colour is never put back and the row
+	// stays bare until the computed value happens to change (EM-101). A key
+	// carried in the style dies with it, so a re-rendered label always repaints.
 	function setText(row, value) {
-		if ((row.dataset.fcText || "") === value) { return; }
-		row.dataset.fcText = value;
 		// Only recolor the name, not the whole label, so git badges keep their color.
 		var names = row.querySelectorAll(".label-name");
-		for (var i = 0; i < names.length; i++) { names[i].style.color = value; }
+		for (var i = 0; i < names.length; i++) {
+			var s = names[i].style;
+			if (s.getPropertyValue("--fc-text-key") === value) { continue; }
+			s.setProperty("--fc-text-key", value);
+			s.color = value;
+		}
 	}
 
 	// An inset focus ring, tracked like setBg so we only touch rows we own.
@@ -393,11 +406,11 @@
 	// shorthand takes both, which is what lets a pill carry a multi-stop fill.
 	function setLabelBg(row, value, radius, outlineColor) {
 		var key = value ? value + "|" + radius + "|" + (outlineColor || "") : "";
-		if ((row.dataset.fcPill || "") === key) { return; }
-		row.dataset.fcPill = key;
 		var names = row.querySelectorAll(".label-name");
 		for (var i = 0; i < names.length; i++) {
 			var s = names[i].style;
+			if (s.getPropertyValue("--fc-pill-key") === key) { continue; }
+			s.setProperty("--fc-pill-key", key);
 			s.background = value;
 			s.borderRadius = value ? radius + "px" : "";
 			s.padding = value ? "0 5px" : "";
@@ -409,12 +422,13 @@
 	// The label weight/style, for the `text` layer (bold/italic). Empty = theme default.
 	function setTextStyle(row, weight, style) {
 		var key = weight + "|" + style;
-		if ((row.dataset.fcTextStyle || "") === key) { return; }
-		row.dataset.fcTextStyle = key;
 		var names = row.querySelectorAll(".label-name");
 		for (var i = 0; i < names.length; i++) {
-			names[i].style.fontWeight = weight;
-			names[i].style.fontStyle = style;
+			var s = names[i].style;
+			if (s.getPropertyValue("--fc-ts-key") === key) { continue; }
+			s.setProperty("--fc-ts-key", key);
+			s.fontWeight = weight;
+			s.fontStyle = style;
 		}
 	}
 
@@ -913,24 +927,48 @@
 		}
 	}
 
-	var scheduled = false;
+	var framePending = false;   // a paint is booked for the next animation frame
+	var timerPending = false;   // a paint is booked after the cooldown below
 	var lastPaint = 0;
-	// At most one paint every 80ms. A paste can produce dozens of style/class
-	// mutations within a single frame (and more as Monaco keeps reacting over
-	// the next several frames); without this, each one schedules its own
-	// animation-frame repaint back to back for as long as the burst runs.
-	var THROTTLE_MS = 80;
+	var lastCost = 0;           // how long the last paint took, in ms
+
+	// The list recycles its rows as it scrolls: a row keeps the fill, edge bar and
+	// pill we gave its previous occupant until we repaint it. So the pace to keep
+	// is the one the list is redrawn at — one paint per animation frame — and
+	// anything slower is measured in frames of somebody else's colours (EM-100,
+	// EM-101).
+	//
+	// 2.1.7 instead held a fixed 80ms between paints, because a mutation storm
+	// could otherwise queue a paint per frame for as long as the storm ran. That
+	// brake is kept, but it now engages only while paints are actually expensive:
+	// under BUDGET_MS (about half a 60fps frame) there is nothing to protect
+	// against, and over it a workspace falls back to the old pace rather than
+	// monopolising the main thread.
+	var COOLDOWN_MS = 80;
+	var BUDGET_MS = 8;
+
+	function paintNow(root) {
+		framePending = false;
+		var started = (window.performance && performance.now) ? performance.now() : 0;
+		paint(root);
+		lastPaint = Date.now();
+		lastCost = started ? performance.now() - started : lastCost;
+	}
+
 	function schedule(root) {
-		if (scheduled) { return; }
-		scheduled = true;
-		var wait = Math.max(0, THROTTLE_MS - (Date.now() - lastPaint));
+		if (framePending) { return; }     // already booked for this frame
+		if (lastCost <= BUDGET_MS) {      // cheap: keep up with the list itself
+			framePending = true;
+			requestAnimationFrame(function () { paintNow(root); });
+			return;
+		}
+		if (timerPending) { return; }     // expensive: at most one per cooldown
+		timerPending = true;
 		setTimeout(function () {
-			requestAnimationFrame(function () {
-				scheduled = false;
-				lastPaint = Date.now();
-				paint(root);
-			});
-		}, wait);
+			timerPending = false;
+			framePending = true;
+			requestAnimationFrame(function () { paintNow(root); });
+		}, Math.max(0, COOLDOWN_MS - (Date.now() - lastPaint)));
 	}
 
 	// The element a tree-change observer is currently attached to, so a
@@ -960,6 +998,13 @@
 			attachedRoot = null;
 			waitForExplorer();
 		}).observe(document.body, { subtree: true, childList: true });
+
+		// Scrolling recycles rows under us every frame, so repaint in step with it
+		// instead of waiting on the mutation observer. A `scroll` event does not
+		// bubble, hence the capture phase; it is passive because we never block
+		// the scroll itself.
+		root.addEventListener("scroll", function () { schedule(root); },
+			{ capture: true, passive: true });
 
 		// Hover needs no listener at all: the painter publishes `--fc-bg-hover`/
 		// `--fc-pill-hover` up front and the generated CSS's `:hover` rules apply
