@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -2612,28 +2612,28 @@
         "premiumExplorer.gitMarkStyle": {
           "type": "string",
           "enum": [
-            "chip",
             "bare",
+            "chip",
             "outline",
             "solid",
             "none"
           ],
           "enumDescriptions": [
+            "Exactly what VS Code does — the status colour untouched, whatever is under it. The default: Premium Explorer leaves Git's marks alone unless you ask it not to.",
             "The filename, the status letter and the folder dot are lifted clear of the row, and the letter gets a plate stepped off the row's ground with a border in Git's own colour. Applied only where a background actually paints.",
-            "Exactly what VS Code does — the status colour untouched, whatever is under it.",
             "The lift, with a border in the lifted hue and no plate.",
             "The status colour becomes the letter’s plate, with the letter knocked out of it.",
             "Hide the status letter and the folder dot; the filename still lifts."
           ],
-          "default": "chip",
-          "markdownDescription": "How Git's status marks are kept readable once Premium Explorer paints a background under them.\n\nVS Code picks the status colour against the *theme's* background, so over a fill it can fall a long way short of readable — measured over an amber fill: modified 3.4:1, added 2.5:1, deleted 1.3:1, against a 4.5:1 target. `chip` fixes that by lifting each mark against the colour the row actually shows, and putting the letter on a plate stepped off that same ground with a border at Git's own hex.\n\n`chip` applies to **every row of a coloured folder**, including the ones that paint no fill of their own: with `innerBackgroundStyle: none` the children sit on the theme's own ground, where three of Git's four hexes already pass and the lift is simply a no-op — but deleted still fails at 3.3:1 and is lifted even there. A row outside every coloured folder keeps exactly what VS Code painted; `bare` opts out everywhere.\n\n**Selection outranks Git.** On a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, because the plate and the border still carry which status it is — and the chip inverts to dark-on-light so the letter stays legible on a bright selection."
+          "default": "bare",
+          "markdownDescription": "How Git's status marks are treated on a row Premium Explorer paints.\n\n**`bare` is the default, and it changes nothing**: Git's filename colour, status letter and folder dot are left exactly as VS Code drew them. Every other value is opt-in — Premium Explorer only restyles Git's marks when you ask it to here.\n\nThe reason to ask: VS Code picks the status colour against the *theme's* background, so over a fill it can fall a long way short of readable — measured over an amber fill: modified 3.4:1, added 2.5:1, deleted 1.3:1, against a 4.5:1 target. `chip` fixes that by lifting each mark against the colour the row actually shows, and putting the letter on a plate stepped off that same ground with a border at Git's own hex.\n\nOnce set, `chip` applies to **every row of a coloured folder**, including the ones that paint no fill of their own: with `innerBackgroundStyle: none` the children sit on the theme's own ground, where three of Git's four hexes already pass and the lift is simply a no-op — but deleted still fails at 3.3:1 and is lifted even there. A row outside every coloured folder keeps exactly what VS Code painted.\n\nWhile this is `bare`, every other `premiumExplorer.git*` colour and `#premiumExplorer.symlinkMarkColor#` is inert — they describe how a mark is restyled, and nothing is.\n\n**Selection outranks Git.** On a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, because the plate and the border still carry which status it is — and the chip inverts to dark-on-light so the letter stays legible on a bright selection."
         },
         "premiumExplorer.gitMarkContrast": {
           "type": "number",
           "minimum": 1,
           "maximum": 21,
           "default": 4.5,
-          "markdownDescription": "The WCAG contrast ratio an `auto` git-mark colour is lifted to, against the colour the row actually shows. 4.5:1 is the WCAG AA threshold for body text; 3:1 is the large-text threshold. A lift stops as soon as it reaches the target, so the mark keeps as much of its status colour as the target allows — and if the target is unreachable (a mid grey has no colour at 4.5:1) the mark lands as close as it can rather than vanishing."
+          "markdownDescription": "The WCAG contrast ratio an `auto` git-mark colour is lifted to, against the colour the row actually shows. 4.5:1 is the WCAG AA threshold for body text; 3:1 is the large-text threshold. A lift stops as soon as it reaches the target, so the mark keeps as much of its status colour as the target allows — and if the target is unreachable (a mid grey has no colour at 4.5:1) the mark lands as close as it can rather than vanishing.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): no mark is lifted, so there is no target to reach."
         },
         "premiumExplorer.gitLabelColor": {
           "anyOf": [
@@ -2720,7 +2720,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The **filename** of a file Git has decorated.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n**Selection outranks this entirely**: on a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, since the chip's plate and border still carry which status it is."
+          "markdownDescription": "The **filename** of a file Git has decorated.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n**Selection outranks this entirely**: on a selected row the filename takes `#premiumExplorer.selectedTextColor#` and the status colour is dropped, since the chip's plate and border still carry which status it is.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.gitMarkColor": {
           "anyOf": [
@@ -2807,7 +2807,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The **status letter**'s ink (`M`, `A`, `U`, `D`).\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status."
+          "markdownDescription": "The **status letter**'s ink (`M`, `A`, `U`, `D`).\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.gitMarkBackgroundColor": {
           "anyOf": [
@@ -2894,7 +2894,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The **plate** behind the status letter, under `gitMarkStyle: chip` or `solid`.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` means the row's own ground stepped off itself for `chip`, and the status colour lifted until a knockout letter reads out of it for `solid`."
+          "markdownDescription": "The **plate** behind the status letter, under `gitMarkStyle: chip` or `solid`.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` means the row's own ground stepped off itself for `chip`, and the status colour lifted until a knockout letter reads out of it for `solid`.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.gitMarkBorderColor": {
           "anyOf": [
@@ -2981,7 +2981,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The status letter's **border**.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` keeps Git's own hex for `chip` — the plate says *a mark*, the border says *which* mark — and takes the lifted hue for `outline`."
+          "markdownDescription": "The status letter's **border**.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\n`auto` keeps Git's own hex for `chip` — the plate says *a mark*, the border says *which* mark — and takes the lifted hue for `outline`.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.gitFolderDotColor": {
           "anyOf": [
@@ -3068,7 +3068,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The **dot** on a folder that contains changes.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\nVS Code draws it at 40% opacity, which would undo any lift, so a row we take over shows it at full strength with a halo in the plate colour."
+          "markdownDescription": "The **dot** on a folder that contains changes.\n\n- `auto` — derived in the browser from the colour the row *actually* shows, lifted until it reads at `#premiumExplorer.gitMarkContrast#`:1. This is the only value that can be right in every theme, over every fill.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted alone.\n- a **per-status map** — `{\"modified\": \"#…\", \"deleted\": \"auto\"}`; the four keys are `modified`, `added`, `untracked`, `deleted`. A decoration from some other extension gets the single/`auto` treatment, since it has no git status.\n\nVS Code draws it at 40% opacity, which would undo any lift, so a row we take over shows it at full strength with a halo in the plate colour.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.symlinkMark": {
           "type": "string",
@@ -3094,7 +3094,7 @@
             }
           ],
           "default": "auto",
-          "markdownDescription": "The colour of the **symlink arrow** VS Code appends to a symlinked row's file-decoration badge (`⤷`).\n\n- `auto` — the tree's own icon foreground, i.e. the chevron ink.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted.\n\nOn a **selected** row it swaps for `#premiumExplorer.selectedTextColor#`, exactly as the Git letter does.\n\n**It only applies where the arrow is the whole badge.** Beside a Git status letter the two arrive as one string (`U, ⤷`) in one `::after` with one colour, so there is nothing to colour separately and `#premiumExplorer.gitMarkStyle#` governs both — which is also what plates them together into one chip."
+          "markdownDescription": "The colour of the **symlink arrow** VS Code appends to a symlinked row's file-decoration badge (`⤷`).\n\n- `auto` — the tree's own icon foreground, i.e. the chevron ink.\n- a **hex** — used as given.\n- `off` — leave whatever VS Code painted.\n\nOn a **selected** row it swaps for `#premiumExplorer.selectedTextColor#`, exactly as the Git letter does.\n\n**It only applies where the arrow is the whole badge.** Beside a Git status letter the two arrive as one string (`U, ⤷`) in one `::after` with one colour, so there is nothing to colour separately and `#premiumExplorer.gitMarkStyle#` governs both — which is also what plates them together into one chip.\n\nInert while `#premiumExplorer.gitMarkStyle#` is `bare` (the default): nothing of Git's is restyled, so there is nothing for this to colour."
         },
         "premiumExplorer.radiusScale": {
           "type": "string",

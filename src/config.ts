@@ -668,7 +668,9 @@ export function readConfig(): FolderColorerConfig {
     ) ?? [],
     radiusScale: parseRadiusScale(cfg.get<string>('radiusScale')) ?? 'block',
     git: {
-      style: parseGitMarkStyle(cfg.get<string>('gitMarkStyle')) ?? 'chip',
+      // `bare` is the no-op, and it is the default: Git's own marks are left
+      // alone until the user asks for a style here.
+      style: parseGitMarkStyle(cfg.get<string>('gitMarkStyle')) ?? 'bare',
       color: parseGitColor(cfg.get('gitMarkColor')) ?? 'auto',
       background: parseGitColor(cfg.get('gitMarkBackgroundColor')) ?? 'auto',
       border: parseGitColor(cfg.get('gitMarkBorderColor')) ?? 'auto',

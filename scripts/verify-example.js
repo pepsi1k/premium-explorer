@@ -440,6 +440,22 @@ function sameNumbers(got, want) {
     'EM-96 the chip inverts to dark-on-light on a selected row and keeps its border');
   check(js.includes('badges[r]') && js.includes('function badgeBox'),
     'EM-96 the watermark treats the status letter and the folder dot as text');
+  // Nothing of Git's is restyled until the user asks: the shipped default is the
+  // no-op, and the example only sees chips because its own settings say `chip`.
+  const schema = require(path.join(ROOT, 'package.json'))
+    .contributes.configuration.properties['premiumExplorer.gitMarkStyle'];
+  check(schema.default === 'bare' && schema.enum[0] === 'bare',
+    'EM-96 gitMarkStyle ships as "bare", so git marks are opt-in',
+    `default ${schema.default}, enum starts ${schema.enum[0]}`);
+  check(fs.readFileSync(path.join(ROOT, 'src/config.ts'), 'utf8')
+    .includes("parseGitMarkStyle(cfg.get<string>('gitMarkStyle')) ?? 'bare'"),
+    'EM-96 the reader falls back to "bare" too, not to the old "chip"');
+  // The chip is a 15px box dropped into a 22px row. VS Code hands the badge a hard
+  // `margin-top: 7px` for its own 11px line of text; left in place that put the
+  // chip's bottom edge exactly on the row's, where it bled into the row below.
+  check(/\.fc-git-chip[\s\S]*?align-self: center;[\s\S]*?margin-top: 0;/.test(css)
+    && /\.fc-git-chip[\s\S]*?height: 15px;/.test(css),
+    'EM-96 the chip is centred in the row rather than sitting on the baseline');
 
   // The lift is the whole point of the ticket, so measure it rather than grep it:
   // the hexes and the failing ratios below are the ones the ticket reported.

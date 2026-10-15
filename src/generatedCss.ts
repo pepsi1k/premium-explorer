@@ -110,8 +110,9 @@ export function buildCss(): string {
   //
   // `!important` on the colours because VS Code's own `::after` rule sets `color`;
   // the plate and border are ours alone and need no weight. `box-sizing` keeps the
-  // border from growing the letter, and the padding is the chip's whole geometry —
-  // VS Code's own `margin: 0 8px 0 5px` is left alone so the row's layout holds.
+  // border from growing the letter, and the padding plus the centring below are the
+  // chip's whole geometry — VS Code's horizontal margins are left alone so the row's
+  // layout holds.
   const gitRow = 'body.fc-active .explorer-folders-view .monaco-list-row';
   const letter = (marker: string): string =>
     `${gitRow}${marker} .monaco-icon-label.monaco-decoration-text-badge::after`;
@@ -130,15 +131,29 @@ export function buildCss(): string {
     '}\n' +
     // The chip itself: a small square plate with the letter centred in it, as the
     // design draws it. `inline-flex` is what centres a single character in a box
-    // this size; the letter's own `margin` is VS Code's and is left alone so the
-    // row's layout does not shift under it.
+    // this size.
+    //
+    // The vertical placement is the whole reason this rule carries margins at all.
+    // `.monaco-icon-label` is a flex row and the badge is one of its items, and
+    // VS Code's own `.monaco-icon-label:after { margin: auto 16px 0 5px }` gives it
+    // an **auto top margin against a zero bottom one**. A flex item's auto margin
+    // eats the free space on that side, so a box shorter than the 22px row is
+    // pushed flush to the row's bottom edge: harmless for VS Code's bare 11px
+    // letter, but our 15px plate then sat on the row boundary and bled into the row
+    // below (EM-96 — the auto margin is why devtools reports a 7px top here and 0px
+    // on an unstyled row). Zeroing both margins is what lets `align-self` centre it;
+    // the horizontal margins stay as VS Code set them, so the row's layout and the
+    // right-hand gutter do not shift under us.
     `${letter('.fc-git-chip')},\n${letter('.fc-git-outline')} {\n` +
     '\tbox-sizing: border-box;\n' +
     '\tdisplay: inline-flex;\n' +
     '\talign-items: center;\n' +
     '\tjustify-content: center;\n' +
+    '\talign-self: center;\n' +
     '\tmin-width: 15px;\n' +
     '\theight: 15px;\n' +
+    '\tmargin-top: 0;\n' +
+    '\tmargin-bottom: 0;\n' +
     '\tpadding: 0 2px;\n' +
     '\tline-height: 1;\n' +
     '\tborder-radius: 3px;\n' +

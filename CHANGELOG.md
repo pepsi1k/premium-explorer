@@ -3,6 +3,26 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.5.0] - 2026-10-15
+
+### Changed
+- **Git's status marks are left alone unless you ask.** `gitMarkStyle` now
+  defaults to `bare`: the filename colour, the status letter and the folder dot
+  stay exactly as VS Code drew them, on every row, painted or not. 2.4.0
+  defaulted to `chip` and restyled them for everyone — a colouring extension
+  should not take over Git's marks uninvited. **If you want the chips back, set
+  `"premiumExplorer.gitMarkStyle": "chip"`**; `outline`, `solid` and `none` are
+  unchanged and equally opt-in. While the style is `bare`, every `git*` colour
+  and `symlinkMarkColor` is inert, since there is nothing for them to colour.
+
+### Fixed
+- **The status chip no longer hangs off the bottom of its row.** VS Code gives
+  the badge an auto top margin against a zero bottom one, so a box shorter than
+  the row absorbs all the slack above it and sits flush on the row's edge —
+  which put the chip's border on the boundary, reading as a spill into the row
+  below. It is now centred in the row; the horizontal spacing is untouched, so
+  nothing else shifts.
+
 ## [2.4.0] - 2026-10-14
 
 ### Added
