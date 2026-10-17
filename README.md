@@ -1,262 +1,148 @@
 # Premium Explorer
 
-<img src="assets/logo/png/logo-edge-ondark-128.png" alt="Premium Explorer logo" width="64" height="64" />
+Color folders in the VS Code Explorer, so you can tell your projects apart without
+reading the names.
 
-Color folders in the VS Code Explorer using **path-scoped rules**. Point a rule at
-a folder and choose how it's colored:
+Point a rule at a folder. Either every Git repo under it gets its own stable color,
+or you pick the colors yourself. Nothing is colored until you add a rule.
 
-- **`git` engine** — every Git repository found under that path gets an automatic,
-  stable color (hashed from its name), so a directory full of projects is
-  color-coded at a glance.
-- **`manual` engine** — that folder, and everything inside it, gets a color you pick.
-- **`default` engine** — same as `manual` but uses `premiumExplorer.defaultColor`.
-  It's the engine used when a rule omits `engine`, and it's handy for resetting an
-  inner path back to the default color.
+## Install
 
-Rules are resolved by **path specificity**: a deeper rule wins, so a `manual` rule
-inside a `git` region overrides it for that subtree.
+1. Install [Premium Explorer](https://marketplace.visualstudio.com/items?itemName=pepsik.premium-explorer)
+   from the Marketplace.
+2. **Make sure VS Code's own install directory is writable by you.** Row
+   backgrounds have no extension API, so painting works by adding two lines to
+   VS Code's `workbench.html` and dropping a small CSS/JS pair beside it — inside
+   the application itself. A Windows User Installer download, a macOS `.app` you
+   installed yourself or a Linux tarball in your home directory already are. A
+   system-wide install (`Program Files`, `/usr/share/code`) is owned by
+   Administrator or root and needs you to grant yourself write access first;
+   Snap and Flatpak are read-only and cannot be patched at all. See
+   [If VS Code is installed system-wide](#if-vs-code-is-installed-system-wide).
+3. Run **Premium Explorer: Enable Background Painting** from the Command Palette.
+   It tells you which directory it needs if it cannot write there, and changes
+   nothing until it can.
+4. Reload the window.
 
-With **no rules configured, nothing is colored** — you opt in per path.
+That is the whole setup. Steps 2 and 3 are needed once per VS Code install (see
+[Why it patches VS Code](#why-it-patches-vs-code)); folder badges work without
+any of it.
 
-## Quick start
+## Examples
+
+Rules live in your user or workspace `settings.json`. Paths are workspace-relative
+(`.`, `./notes`) or absolute.
+
+**Every Git repo in a folder of projects gets a color:**
 
 ```jsonc
 "premiumExplorer.rules": [
-  // Auto-color every Git repo in the workspace:
-  { "path": ".", "engine": "git" },
-
-  // Give a specific folder (and its contents) a fixed color:
-  { "path": "./notes", "engine": "manual", "color": "#00b8ff" },
-
-  // Override one project inside the git region with your own color:
-  { "path": "./github/special", "engine": "manual", "color": "#ff8800" },
-
-  // engine omitted -> "default" engine (uses premiumExplorer.defaultColor):
-  { "path": "./scratch" }
+  { "path": ".", "engine": "git" }
 ]
 ```
 
-Paths may be **workspace-relative** (`.`, `./projects`) or **absolute**.
+<img src="assets/readme/git-colors.png" alt="Three Git repositories under a work folder, each row in its own color" width="440" />
 
-## How it works
+The color is hashed from the repo name, so it is the same color tomorrow and on your
+other machine. The examples below are single entries in that same list.
 
-VS Code has **no API for Explorer row backgrounds**. Through `FileDecorationProvider`
-an extension can set a label's badge and tooltip, and nothing else — and extensions
-run in a separate process from the window you see, so none of them can reach the
-workbench DOM directly.
+**One folder, your color:**
 
-Premium Explorer therefore works in two halves:
-
-1. **Generate.** It resolves your rules into a set of colored folders and bakes each
-   one's layers — background fill, left edge bar, label pill, text style, tiled
-   watermark — into a CSS/JS pair in the extension's global storage.
-2. **Paint.** That script runs inside the workbench, walks the Explorer's row DOM,
-   and applies the pre-computed values to each row.
-
-Step 2 is the part VS Code doesn't sanction: the only way into the workbench is to
-edit what it loads from disk. Premium Explorer does that itself — **no companion
-extension required**. **Until you turn painting on you get the badge and nothing
-else**: every colour, bar, pill and watermark comes from the injected pair.
-
-## Turning on background painting
-
-Run **Premium Explorer: Enable Background Painting** from the Command Palette and
-reload the window. That is the whole setup.
-
-It writes the generated pair into your VS Code installation's workbench directory
-and adds two lines to `workbench.html`:
-
-```html
-<link rel="stylesheet" href="./premium-explorer.css">
-<script src="./premium-explorer.js"></script>
+```jsonc
+{ "path": "./notes", "rootBackgroundColor": "#00b8ff", "innerBackgroundColor": "#00b8ff" }
 ```
 
-**Premium Explorer: Disable Background Painting (Restore Workbench)** undoes it.
-The original `workbench.html` is backed up before the first patch and restored
-byte-for-byte.
+`root*` is the folder's own row, `inner*` is everything inside it. Inner rows are
+tinted lighter by default (opacity `0.15` against the root's `0.5`).
 
-### Before you enable it
+**A deeper rule wins:**
 
-- **VS Code will report that your installation "appears corrupt."** `workbench.html`
-  is checksummed, so any change trips that banner. It's safe to dismiss — it means
-  the file differs from the shipped one, not that anything is broken.
-- **A VS Code update reverts it.** Updates replace the whole directory. Premium
-  Explorer notices on the next launch and offers to re-apply.
-- **The first run may need permission.** VS Code's install directory is usually
-  system-owned. Premium Explorer checks before it touches anything and warns you if
-  it can't write; granting access is a manual step you do yourself — see
-  [System-owned installs](#system-owned-installs).
-- **Desktop only.** The patch has to be applied on the machine drawing the window,
-  so this does nothing in the browser, or on the remote side of an SSH, WSL or
-  container window. Rules and badges still work there.
-- **It targets VS Code's internal DOM** (`.monaco-list-row`), which carries no
-  compatibility promise — an update can change it.
-
-Two deliberate differences from how vscode-custom-css patches the same file: the
-Content Security Policy is left intact (custom-css deletes it), and the tags above
-*reference* the generated files rather than carrying their contents, so changing a
-setting rewrites only those two files and never revisits `workbench.html`.
-
-### System-owned installs
-
-The workbench lives inside VS Code's own installation, so patching it means writing
-into that directory. Whether you already can depends entirely on how VS Code was
-installed:
-
-| Install | Directory | Writable? |
-| --- | --- | --- |
-| Windows **User Installer** (the default download) | `%LOCALAPPDATA%\Programs\Microsoft VS Code` | **Yes** — nothing to do |
-| Windows **System Installer** | `C:\Program Files\Microsoft VS Code` | No — Administrator-owned |
-| macOS `.app` | `/Applications/Visual Studio Code.app` | Usually yes, if you installed it |
-| Linux `.deb` / `.rpm` / tarball to `/usr/share` | `/usr/share/code` | No — root-owned |
-| Linux tarball in your home directory | wherever you unpacked it | **Yes** |
-| Linux **Snap** or **Flatpak** | read-only image | **Never** |
-
-Premium Explorer tests this before it writes anything, so an install it can't write
-to is left exactly as it was. All it does then is tell you: a warning naming the
-directory and saying you need write access to it.
-
-**Granting that access is yours to do, and the extension will never do it for you.**
-It won't run anything privileged, won't ask for a password, and won't open a
-terminal on your behalf. What you do about it is your call — on Linux, typically:
-
-```
-sudo chown -R "$USER" "/usr/share/code/resources/app/out/vs/code/electron-browser/workbench"
+```jsonc
+"premiumExplorer.rules": [
+  { "path": ".", "engine": "git" },
+  { "path": "./work/payments", "rootBackgroundColor": "#e6194b",
+    "innerBackgroundColor": "#e6194b", "rootMark": "docker" }
+]
 ```
 
-Three things worth knowing before you run it:
+Everything is auto-colored, except `payments`, which is red and carries a whale.
 
-- **A VS Code update undoes it.** Updates replace that whole directory, which
-  restores root ownership *and* removes the patch. Premium Explorer notices on the
-  next launch and asks again — expect to repeat this after each update.
-- **On a `.deb`/`.rpm` install, package verification will notice.** `dpkg -V` and
-  `rpm -V` report the changed ownership. Nothing breaks; the report is cosmetic.
-- **On macOS it invalidates the app's code signature**, the same as any other
-  workbench-patching extension.
-
-**Snap and Flatpak cannot be made to work**, by this extension or any other in this
-space: the app is mounted from a read-only image, so there is no permission to
-grant. Install the `.deb`/`.rpm` or the tarball if you want background painting.
-On Windows, the permanent fix is the User Installer — reinstalling with it moves
-VS Code somewhere you already own, and the problem never comes back. (Running VS
-Code as Administrator once also works, but only for that session.)
-
-Folder badges and label colors need none of this — they use the supported
-decoration API and work on every install shape, including Snap, Flatpak and remote
-windows.
-
-### Coming from vscode-custom-css
-
-Earlier versions could hand the generated pair to
-[`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css)
-instead. That path is gone as of 2.1.0 — Premium Explorer needs no second extension
-— and **Generate Background CSS (for vscode-custom-css)** no longer exists.
-
-If you were on it, just run **Enable Background Painting**. It takes Premium
-Explorer's own entries back out of `vscode_custom_css.imports` on the way (two
-copies of the script would paint every row twice); anything you added there
-yourself is left alone. vscode-custom-css itself is then yours to keep or
-uninstall.
-
-Editing any `premiumExplorer.*` setting regenerates the files and offers a **Reload
-Window** button. After cloning or removing repositories, re-run **Enable Background
-Painting** so the new folders are picked up.
-
-**Multiple workspaces:** the generated files are a single global set shared by
-every window, but colors are scoped **per workspace** — the injected script only
-paints the workspace shown in the current window, so opening a different project
-doesn't inherit another one's colors. Within one workspace, folders are matched by
-**name** (two folders with the same name there share a color).
+Pills, gradient fills, watermarks, marks, edge bars and inherited inner rows each
+have a screenshot and the rule behind it in
+[docs/examples.md](docs/examples.md). Or open [`example/`](example/) in VS Code and
+see all of it at once, one folder per case.
 
 ## Settings
 
-### Rules
-- `premiumExplorer.rules` — the list described above. Each entry is
-  `{ "path": string, "engine"?: "git" | "manual" | "default", "color"?: hex }`.
-  `engine` defaults to `"default"`.
-  A rule may also **override the global settings for that path** with optional
-  `"rootOpacity"`, `"contentsOpacity"`, `"colorText"`, and — styled separately for
-  the folder row vs. its contents — `"rootStyle"`/`"rootBackground"`/`"rootText"` and
-  `"innerStyle"`/`"innerBackground"`/`"innerText"`. Example:
-  `{ "path": "./notes", "engine": "manual", "color": "#00b8ff", "rootStyle": "pill", "innerStyle": "none" }`.
-- `premiumExplorer.defaultColor` (`#808080`) — color used by the `default` engine.
+A folder is painted in six independent layers: **background**, **edge** bar,
+**pill**, **text**, **watermark** and **mark**. Each layer has a `root*` key for
+the folder's row and an `inner*` key for the rows inside it. The same keys work on
+a rule, where they apply to that folder only.
 
-### Coloring
-- `premiumExplorer.enabled` (`true`) — master on/off.
-- `premiumExplorer.colorText` (`true`) — tint label text. Turn off for
-  background-only.
-- `premiumExplorer.colorBy` (`"name"` | `"path"`, `"name"`) — what to hash for a
-  git repo's automatic color.
-- `premiumExplorer.palette` (string[], up to 16 hex) — the pool of automatic colors.
-- `premiumExplorer.badge` (string, ≤ 2 chars) — optional badge on colored roots.
+There are over a hundred of them. Open Settings, search `premiumExplorer`, and read
+the descriptions there instead of here. The ones most people touch:
 
-### Backgrounds (used by the generated files)
-- `premiumExplorer.rootOpacity` (`0.5`) — background opacity of the colored root row.
-- `premiumExplorer.contentsOpacity` (`0.15`) — background opacity of inner files.
-- `premiumExplorer.rootStyle` (`"full"` | `"pill"` | `"edge"`) — how the **root** folder
-  row is painted: `full` = whole row, `pill` = a rounded background behind just the
-  label text, `edge` = a bar on the left side.
-- `premiumExplorer.innerStyle` (`"full"` | `"pill"` | `"edge"` | `"none"`) — how the
-  **contents** are painted, or `none` to leave them uncolored.
-  Both are overridable per path (`"rootStyle"` / `"innerStyle"`), and a rule may set
-  explicit `rootBackground`/`rootText`/`innerBackground`/`innerText` colors.
-- `premiumExplorer.selectedBackgroundColor` (`"invert"` | hex) — selected row
-  background. `invert` uses the folder's own color.
-- `premiumExplorer.selectedTextColor` (`"auto"` | hex) — selected row text color.
-- `premiumExplorer.selectedOpacity` (`1`) — opacity of the selected background.
-- `premiumExplorer.selectedBold` (`true`) — bold the selected label.
-- `premiumExplorer.selectedBorder` (`"auto"` | `"none"` | hex) — focus ring drawn
-  around the selected row **while the Explorer is focused**. `auto` uses the theme's
-  focus-outline color.
-- `premiumExplorer.selectedInactiveDarken` (`0.25`) — how much darker the selection
-  gets when the Explorer loses focus (0 = unchanged, 1 = black); the border is also
-  dropped, mirroring VS Code's inactive selection.
+| Setting | What it does |
+| --- | --- |
+| `premiumExplorer.enabled` | Master on/off. |
+| `premiumExplorer.palette` | The pool of automatic colors for `git` rules. |
+| `premiumExplorer.colorBy` | Hash a repo's color from its `name` or full `path`. |
+| `premiumExplorer.badge` | Up to 2 characters shown on colored folders. |
+| `premiumExplorer.selected*` | How the selected row looks. |
+| `premiumExplorer.git*` | How Git status letters and dots are colored. |
 
 ## Commands
 
-- **Premium Explorer: Enable Background Painting** — generate the CSS/JS pair and
-  patch this VS Code install to load it.
-- **Premium Explorer: Disable Background Painting (Restore Workbench)** — undo that
-  patch and remove the files it added.
-- **Premium Explorer: Refresh Decorations** — re-read settings and re-apply.
+- **Premium Explorer: Enable Background Painting**
+- **Premium Explorer: Disable Background Painting (Restore Workbench)**
+- **Premium Explorer: Refresh**
 
-## Architecture
+## Why it patches VS Code
 
-```
-src/
-  extension.ts          Activation + event wiring (thin).
-  config.ts             Reads settings; resolves rules to absolute paths, sorted
-                        deepest-first so a deeper rule wins.
-  colors.ts             Pure hex/rgba/hash helpers and the SVG watermark pattern
-                        generator (no VS Code deps).
-  decorationProvider.ts FileDecorationProvider. Adds the optional badge — the only
-                        Explorer styling the API allows.
-  repositoryScanner.ts  Recursively finds Git repos under a path (for git rules).
-  backgroundStyles.ts   Resolves rules into colored folders and generates the
-                        CSS/JS pair.
-  layers.ts             Bakes one folder's row styling into ready-to-apply values.
-  workbenchPatch.ts     Patches workbench.html to load that pair, and restores it.
-                        Pure Node, no VS Code deps.
-  injection.ts          The VS Code side of that: commands, prompts, and offering
-                        the patch back after a VS Code update removes it.
-media/
-  inject.js             The browser script that does the painting. Static logic;
-                        the per-folder colors are prepended at generate time.
-```
+VS Code has no API for Explorer row backgrounds. An extension can set a badge on a
+label and nothing else. So Premium Explorer bakes your rules into a small CSS/JS
+pair and adds two lines to `workbench.html` so the window loads them. The extension
+works out the colors; that script paints the rows.
+
+Things to know before you enable it:
+
+- **VS Code will say the installation "appears corrupt."** `workbench.html` is
+  checksummed, so any edit trips that banner. Safe to dismiss.
+- **A VS Code update removes the patch.** Premium Explorer notices on the next
+  launch and offers to re-apply.
+- **Disabling restores the original file** byte-for-byte from a backup.
+- **Desktop only.** Badges still work in the browser and in SSH, WSL and container
+  windows; painting does not.
+- It reads VS Code's internal DOM, which carries no compatibility promise.
+
+### If VS Code is installed system-wide
+
+The patch writes into VS Code's own install directory, so it depends on who owns it:
+
+- **Already writable:** Windows User Installer (the default download), a macOS
+  `.app` you installed yourself, a Linux tarball in your home directory.
+- **Needs you to grant write access:** Windows System Installer in `Program Files`,
+  Linux `.deb`/`.rpm` in `/usr/share/code`. A VS Code update takes ownership back,
+  so expect to redo it. On Windows the permanent fix is reinstalling with the User
+  Installer.
+- **Cannot work at all:** Snap and Flatpak. The app is mounted read-only, so there
+  is no permission to grant. Install the `.deb`, `.rpm` or tarball instead.
+
+Premium Explorer checks before it writes, and leaves an install it cannot write to
+exactly as it was. It will tell you which directory it needs. It will never run a
+privileged command, ask for your password, or open a terminal for you. Granting
+access is yours to do, deliberately, outside VS Code.
+
+Folder badges need none of this and work everywhere.
 
 ## Development
 
 ```bash
 pnpm install
-pnpm run watch      # or press F5 to launch the Extension Development Host
-pnpm run package    # type-check + lint + production bundle
+pnpm run watch      # or press F5 for an Extension Development Host
+pnpm run package    # type-check, lint, bundle
 ```
 
-## Publishing checklist
+[CLAUDE.md](CLAUDE.md) explains how the pieces fit together.
 
-Before `vsce publish`, set in `package.json`:
-
-- `publisher` — your VS Marketplace publisher id. **Note:** this changes the
-  extension's storage path, so re-run **Enable Background Painting** afterward.
-- `icon` — path to a 128×128 PNG.
-- `repository` / `bugs` / `homepage` — once the repo is hosted.
+MIT licensed.

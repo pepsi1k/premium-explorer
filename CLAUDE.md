@@ -234,13 +234,22 @@ time, so **dropping a file in is the whole code change**. Two things to know:
 
 ## Gotchas
 
-- **[README.md](README.md) is stale.** Its Settings section still describes the
-  pre-`layers.ts` model (rule-level `"color"`, `rootStyle`/`innerStyle` as
-  `full`/`pill`/`edge`, `colorText`, `rootOpacity`/`contentsOpacity`, and
-  bridging hexes into `workbench.colorCustomizations`). None of that exists.
-  `contributes.configuration` in [package.json](package.json) is the authoritative
-  settings documentation; treat the README's Quick start and Settings as fiction
-  until someone rewrites them.
+- **[README.md](README.md) is a short pitch, not the settings reference.** It was
+  rewritten against 2.5.0 (EM-113) and its examples are schema-valid, but it names
+  only a handful of keys on purpose. The illustrated tour — one screenshot and the
+  rule behind it per feature — lives in [docs/examples.md](docs/examples.md), and
+  `contributes.configuration` in [package.json](package.json) stays the
+  authoritative settings documentation, with [example/](example/) the working
+  demonstration of each feature. A renamed or removed setting means checking that
+  both files' examples still parse.
+- **The README screenshots are generated, not drawn.** Every image in
+  [assets/readme/](assets/readme/) is a crop of the Explorer painting `example/`,
+  captured over CDP exactly as [.claude/rules/screenshot-proof-in-jira.md](.claude/rules/screenshot-proof-in-jira.md)
+  describes (isolated profile, `Page.captureScreenshot` with a clip over the row
+  range, live workbench files restored afterwards). Re-shoot them from that same
+  workspace when a layer's look changes, or the README quietly documents an old
+  build. `example/` has no `git` rule, so `git-colors.png` is the one image shot
+  from a throwaway workspace of real repositories.
 - **`globalStorageUri` is keyed on the extension id.** A locally built VSIX with no
   `publisher` lands in `undefined_publisher.premium-explorer`, a Marketplace
   install in `pepsik.premium-explorer`. Switching install method silently changes
