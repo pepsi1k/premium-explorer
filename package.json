@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -413,7 +413,19 @@
                     "type": "string"
                   }
                 ],
-                "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+                "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included.\n\nThe **left** value also decides how far the plate reaches left of the text under `#premiumExplorer.rootPillAlign#` `shift`; under `hug` it is ignored."
+              },
+              "rootPillAlign": {
+                "type": "string",
+                "enum": [
+                  "shift",
+                  "hug"
+                ],
+                "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+                "enumDescriptions": [
+                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
+                  "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+                ]
               },
               "rootBackgroundRadius": {
                 "anyOf": [
@@ -533,6 +545,54 @@
               "rootMarkInPill": {
                 "type": "boolean",
                 "markdownDescription": "Grow the pill on the repo root row rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
+              },
+              "rootGlowEffect": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "halo",
+                  "soft",
+                  "neon",
+                  "aurora",
+                  "underglow"
+                ],
+                "markdownDescription": "**Glow** behind the repo root row's label — a soft blurred halo around the text (EM-116).\n\nColour comes from `#premiumExplorer.rootGlowColors#`, or from the folder's own derived sequence when that is empty, so one global setting still gives every folder a glow of its own. `off` leaves the DOM untouched.\n\n`soft` and `neon` are pure `text-shadow`; `halo`, `aurora` and `underglow` draw in a pseudo-element, which costs a `filter: blur` per painted row — prefer the first two on a large tree.\n\nUnlike the fill and the pill there is no `inherit`: a nested rule does not pick up an enclosing folder's glow, for the same reason it does not pick up its mark.",
+                "enumDescriptions": [
+                  "No glow — the label is left untouched.",
+                  "A blurred plate behind the text, masked on both axes so no box edge shows.",
+                  "Two soft shadow rings in the glow colour — the cheapest style, pure `text-shadow`.",
+                  "Three tighter rings stepping light → base → dark, for a lit-tube look. Pair it with a near-white `textColor`.",
+                  "The `halo` plate in two colours, lobed left and right (takes the first two `glowColors`).",
+                  "A thin blurred bar under the text instead of a halo around it."
+                ]
+              },
+              "rootGlowColors": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ]
+                },
+                "markdownDescription": "Colours for the repo root row's glow. Empty = auto-derived from the folder's hash, exactly as the edge bar derives its stripes (see `#premiumExplorer.edgeColorCount#`).\n\n`aurora` is the only style that reads a **second** colour, one lobe each; every other style takes the first and ignores the rest."
+              },
+              "rootGlowIntensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "markdownDescription": "How strong the repo root row's glow is, 0–100: it scales the alpha of every stop the chosen style draws, so the glow fades as a whole rather than changing shape. `100` is the approved design."
+              },
+              "rootGlowSpread": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4,
+                "markdownDescription": "Blur radius (px) for the repo root row's glow, and the scale for the `soft`/`neon` shadow radii with it.\n\nCapped at `4` on purpose: a 22px row leaves no more room, and past that the glow bleeds into the rows above and below. `3` is the approved design."
+              },
+              "rootGlowText": {
+                "type": "boolean",
+                "markdownDescription": "Also light **the label text itself** on the repo root row, on top of whatever `#premiumExplorer.rootGlowEffect#` draws.\n\nOff by default, and that is the approved look: `halo`, `aurora` and `underglow` put their light *behind* the text and leave the glyphs alone. Turning this on adds a `text-shadow` in the glow colour as well, at the same colour, intensity and spread.\n\n`soft` and `neon` already **are** a text glow, so they ignore this."
               },
               "innerBackgroundStyle": {
                 "type": "string",
@@ -851,7 +911,19 @@
                     "type": "string"
                   }
                 ],
-                "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+                "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included.\n\nThe **left** value also decides how far the plate reaches left of the text under `#premiumExplorer.innerPillAlign#` `shift`; under `hug` it is ignored."
+              },
+              "innerPillAlign": {
+                "type": "string",
+                "enum": [
+                  "shift",
+                  "hug"
+                ],
+                "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+                "enumDescriptions": [
+                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
+                  "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+                ]
               },
               "innerBackgroundRadius": {
                 "anyOf": [
@@ -971,6 +1043,54 @@
               "innerMarkInPill": {
                 "type": "boolean",
                 "markdownDescription": "Grow the pill on the inner rows rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
+              },
+              "innerGlowEffect": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "halo",
+                  "soft",
+                  "neon",
+                  "aurora",
+                  "underglow"
+                ],
+                "markdownDescription": "**Glow** behind the inner rows (files/folders inside)'s label — a soft blurred halo around the text (EM-116).\n\nColour comes from `#premiumExplorer.innerGlowColors#`, or from the folder's own derived sequence when that is empty, so one global setting still gives every folder a glow of its own. `off` leaves the DOM untouched.\n\n`soft` and `neon` are pure `text-shadow`; `halo`, `aurora` and `underglow` draw in a pseudo-element, which costs a `filter: blur` per painted row — prefer the first two on a large tree.\n\nUnlike the fill and the pill there is no `inherit`: a nested rule does not pick up an enclosing folder's glow, for the same reason it does not pick up its mark.",
+                "enumDescriptions": [
+                  "No glow — the label is left untouched.",
+                  "A blurred plate behind the text, masked on both axes so no box edge shows.",
+                  "Two soft shadow rings in the glow colour — the cheapest style, pure `text-shadow`.",
+                  "Three tighter rings stepping light → base → dark, for a lit-tube look. Pair it with a near-white `textColor`.",
+                  "The `halo` plate in two colours, lobed left and right (takes the first two `glowColors`).",
+                  "A thin blurred bar under the text instead of a halo around it."
+                ]
+              },
+              "innerGlowColors": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "color-hex"
+                    }
+                  ]
+                },
+                "markdownDescription": "Colours for the inner rows (files/folders inside)'s glow. Empty = auto-derived from the folder's hash, exactly as the edge bar derives its stripes (see `#premiumExplorer.edgeColorCount#`).\n\n`aurora` is the only style that reads a **second** colour, one lobe each; every other style takes the first and ignores the rest."
+              },
+              "innerGlowIntensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "markdownDescription": "How strong the inner rows (files/folders inside)'s glow is, 0–100: it scales the alpha of every stop the chosen style draws, so the glow fades as a whole rather than changing shape. `100` is the approved design."
+              },
+              "innerGlowSpread": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4,
+                "markdownDescription": "Blur radius (px) for the inner rows (files/folders inside)'s glow, and the scale for the `soft`/`neon` shadow radii with it.\n\nCapped at `4` on purpose: a 22px row leaves no more room, and past that the glow bleeds into the rows above and below. `3` is the approved design."
+              },
+              "innerGlowText": {
+                "type": "boolean",
+                "markdownDescription": "Also light **the label text itself** on the inner rows (files/folders inside), on top of whatever `#premiumExplorer.innerGlowEffect#` draws.\n\nOff by default, and that is the approved look: `halo`, `aurora` and `underglow` put their light *behind* the text and leave the glyphs alone. Turning this on adds a `text-shadow` in the glow colour as well, at the same colour, intensity and spread.\n\n`soft` and `neon` already **are** a text glow, so they ignore this."
               },
               "rootEdgeColors": {
                 "type": "array",
@@ -1676,7 +1796,20 @@
             }
           ],
           "default": 5,
-          "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+          "markdownDescription": "Space the pill leaves around the label on the repo root row, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included.\n\nThe **left** value also decides how far the plate reaches left of the text under `#premiumExplorer.rootPillAlign#` `shift`; under `hug` it is ignored."
+        },
+        "premiumExplorer.rootPillAlign": {
+          "type": "string",
+          "enum": [
+            "shift",
+            "hug"
+          ],
+          "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+          "enumDescriptions": [
+            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
+            "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+          ],
+          "default": "shift"
         },
         "premiumExplorer.rootBackgroundRadius": {
           "anyOf": [
@@ -1803,6 +1936,59 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Grow the pill on the repo root row rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
+        },
+        "premiumExplorer.rootGlowEffect": {
+          "type": "string",
+          "enum": [
+            "off",
+            "halo",
+            "soft",
+            "neon",
+            "aurora",
+            "underglow"
+          ],
+          "markdownDescription": "**Glow** behind the repo root row's label — a soft blurred halo around the text (EM-116).\n\nColour comes from `#premiumExplorer.rootGlowColors#`, or from the folder's own derived sequence when that is empty, so one global setting still gives every folder a glow of its own. `off` leaves the DOM untouched.\n\n`soft` and `neon` are pure `text-shadow`; `halo`, `aurora` and `underglow` draw in a pseudo-element, which costs a `filter: blur` per painted row — prefer the first two on a large tree.\n\nUnlike the fill and the pill there is no `inherit`: a nested rule does not pick up an enclosing folder's glow, for the same reason it does not pick up its mark.",
+          "enumDescriptions": [
+            "No glow — the label is left untouched.",
+            "A blurred plate behind the text, masked on both axes so no box edge shows.",
+            "Two soft shadow rings in the glow colour — the cheapest style, pure `text-shadow`.",
+            "Three tighter rings stepping light → base → dark, for a lit-tube look. Pair it with a near-white `textColor`.",
+            "The `halo` plate in two colours, lobed left and right (takes the first two `glowColors`).",
+            "A thin blurred bar under the text instead of a halo around it."
+          ],
+          "default": "off"
+        },
+        "premiumExplorer.rootGlowColors": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "color-hex"
+              }
+            ]
+          },
+          "markdownDescription": "Colours for the repo root row's glow. Empty = auto-derived from the folder's hash, exactly as the edge bar derives its stripes (see `#premiumExplorer.edgeColorCount#`).\n\n`aurora` is the only style that reads a **second** colour, one lobe each; every other style takes the first and ignores the rest.",
+          "default": []
+        },
+        "premiumExplorer.rootGlowIntensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "markdownDescription": "How strong the repo root row's glow is, 0–100: it scales the alpha of every stop the chosen style draws, so the glow fades as a whole rather than changing shape. `100` is the approved design.",
+          "default": 100
+        },
+        "premiumExplorer.rootGlowSpread": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 4,
+          "markdownDescription": "Blur radius (px) for the repo root row's glow, and the scale for the `soft`/`neon` shadow radii with it.\n\nCapped at `4` on purpose: a 22px row leaves no more room, and past that the glow bleeds into the rows above and below. `3` is the approved design.",
+          "default": 3
+        },
+        "premiumExplorer.rootGlowText": {
+          "type": "boolean",
+          "markdownDescription": "Also light **the label text itself** on the repo root row, on top of whatever `#premiumExplorer.rootGlowEffect#` draws.\n\nOff by default, and that is the approved look: `halo`, `aurora` and `underglow` put their light *behind* the text and leave the glyphs alone. Turning this on adds a `text-shadow` in the glow colour as well, at the same colour, intensity and spread.\n\n`soft` and `neon` already **are** a text glow, so they ignore this.",
+          "default": false
         },
         "premiumExplorer.rootEdgeColors": {
           "type": "array",
@@ -2280,7 +2466,20 @@
             }
           ],
           "default": 5,
-          "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included."
+          "markdownDescription": "Space the pill leaves around the label on the inner rows, in px.\n\n```jsonc\n5                 // horizontal only — vertical stays 0 (what ships today)\n[2, 8]            // vertical, horizontal\n[2, 8, 2, 6]      // CSS order: top right bottom left\n```\n\n**A single number is horizontal only**, which is not what CSS `padding: 5px` means. That is deliberate: the shipped pill is `0 5px`, so `5` has to keep reproducing it. Two, three and four values follow the CSS shorthand exactly.\n\n**Vertical padding is the risky axis.** A row is about 22px and the label's line box already fills most of it, so vertical padding grows the pill past the row: it will overlap the rows above and below rather than being clipped. 0–2 is usually as far as it goes. The corner radius needs no adjusting — the browser clamps `border-radius` to half the final box, padding included.\n\nThe **left** value also decides how far the plate reaches left of the text under `#premiumExplorer.innerPillAlign#` `shift`; under `hug` it is ignored."
+        },
+        "premiumExplorer.innerPillAlign": {
+          "type": "string",
+          "enum": [
+            "shift",
+            "hug"
+          ],
+          "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+          "enumDescriptions": [
+            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
+            "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+          ],
+          "default": "shift"
         },
         "premiumExplorer.innerBackgroundRadius": {
           "anyOf": [
@@ -2407,6 +2606,59 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Grow the pill on the inner rows rightwards so it **encloses the mark**, instead of letting the mark sit just outside the plate.\n\nThe pill gains `markGap + markSize + 5px` of right padding and the mark stays anchored to the text, so the rounded plate wraps label and mark together. A no-op where either the pill or the mark is off.\n\nTwo things to expect: a pill fill that fades to alpha 0 at its right end fades across the **wider** box, so an enclosed mark may sit on nothing — use a fill that still has colour at its right edge. And hover brightens the pill (`--fc-pill-hover`) but not the mark, so an enclosed mark does not brighten with its plate."
+        },
+        "premiumExplorer.innerGlowEffect": {
+          "type": "string",
+          "enum": [
+            "off",
+            "halo",
+            "soft",
+            "neon",
+            "aurora",
+            "underglow"
+          ],
+          "markdownDescription": "**Glow** behind the inner rows (files/folders inside)'s label — a soft blurred halo around the text (EM-116).\n\nColour comes from `#premiumExplorer.innerGlowColors#`, or from the folder's own derived sequence when that is empty, so one global setting still gives every folder a glow of its own. `off` leaves the DOM untouched.\n\n`soft` and `neon` are pure `text-shadow`; `halo`, `aurora` and `underglow` draw in a pseudo-element, which costs a `filter: blur` per painted row — prefer the first two on a large tree.\n\nUnlike the fill and the pill there is no `inherit`: a nested rule does not pick up an enclosing folder's glow, for the same reason it does not pick up its mark.",
+          "enumDescriptions": [
+            "No glow — the label is left untouched.",
+            "A blurred plate behind the text, masked on both axes so no box edge shows.",
+            "Two soft shadow rings in the glow colour — the cheapest style, pure `text-shadow`.",
+            "Three tighter rings stepping light → base → dark, for a lit-tube look. Pair it with a near-white `textColor`.",
+            "The `halo` plate in two colours, lobed left and right (takes the first two `glowColors`).",
+            "A thin blurred bar under the text instead of a halo around it."
+          ],
+          "default": "off"
+        },
+        "premiumExplorer.innerGlowColors": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "color-hex"
+              }
+            ]
+          },
+          "markdownDescription": "Colours for the inner rows (files/folders inside)'s glow. Empty = auto-derived from the folder's hash, exactly as the edge bar derives its stripes (see `#premiumExplorer.edgeColorCount#`).\n\n`aurora` is the only style that reads a **second** colour, one lobe each; every other style takes the first and ignores the rest.",
+          "default": []
+        },
+        "premiumExplorer.innerGlowIntensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "markdownDescription": "How strong the inner rows (files/folders inside)'s glow is, 0–100: it scales the alpha of every stop the chosen style draws, so the glow fades as a whole rather than changing shape. `100` is the approved design.",
+          "default": 100
+        },
+        "premiumExplorer.innerGlowSpread": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 4,
+          "markdownDescription": "Blur radius (px) for the inner rows (files/folders inside)'s glow, and the scale for the `soft`/`neon` shadow radii with it.\n\nCapped at `4` on purpose: a 22px row leaves no more room, and past that the glow bleeds into the rows above and below. `3` is the approved design.",
+          "default": 3
+        },
+        "premiumExplorer.innerGlowText": {
+          "type": "boolean",
+          "markdownDescription": "Also light **the label text itself** on the inner rows (files/folders inside), on top of whatever `#premiumExplorer.innerGlowEffect#` draws.\n\nOff by default, and that is the approved look: `halo`, `aurora` and `underglow` put their light *behind* the text and leave the glyphs alone. Turning this on adds a `text-shadow` in the glow colour as well, at the same colour, intensity and spread.\n\n`soft` and `neon` already **are** a text glow, so they ignore this.",
+          "default": false
         },
         "premiumExplorer.innerEdgeColors": {
           "type": "array",

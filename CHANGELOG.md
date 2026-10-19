@@ -3,6 +3,48 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.6.0] - 2026-10-19
+
+### Added
+- **A glow behind a row's label.** `rootGlowEffect`/`innerGlowEffect` — `off` by
+  default — in five styles: `halo` (a blurred plate masked so no box edge shows),
+  `soft` and `neon` (pure text-shadow, and the cheapest), `aurora` (the halo in two
+  colours, lobed left and right) and `underglow` (a thin bar under the text).
+  Colours come from `*GlowColors`, or, left empty, from the folder's own derived
+  sequence exactly as the edge bar's stripes do — so one global setting still gives
+  every folder a glow of its own. `*GlowIntensity` (0-100) scales every stop
+  together and `*GlowSpread` (1-4px) scales the whole glow, not just its outer edge.
+  `*GlowText` additionally lights the glyphs themselves; it is off by default,
+  because the three plate styles deliberately put their light *behind* the text.
+- **A choice of where a pill's plate sits**, now that the plate no longer moves the
+  text (below): `rootPillAlign`/`innerPillAlign`, `shift` (default) or `hug`.
+  `shift` keeps the plate's left inset and moves the row's label block to pay for
+  it; `hug` drops the inset and starts the plate at the first glyph. How far left a
+  `shift` plate reaches is `pillPadding`'s **left** value — set the two sides
+  independently with the CSS forms, e.g. `[0, 10, 0, 4]`. Nothing is clamped, so a
+  left padding large enough to reach the row's chevron will reach it; if you
+  already set a generous `pillPadding`, its plate now extends further left than it
+  used to.
+
+### Fixed
+- **A pill no longer pushes its row's text out of line.** The pill's left padding
+  sat on the label itself, so a pilled row's name started further right than every
+  other row at the same depth. The plate cannot simply reach outwards — three
+  `overflow: hidden` ancestors begin exactly at the label's left edge and clip
+  anything drawn left of it — so the row's label block is moved instead, by the
+  same number the padding adds. The text now lands where an unpilled row's text
+  lands, at any padding.
+- **A mark inside a pill appears again.** With `markInPill` the plate reserved the
+  space and left it empty: for a flat-colour pill Chromium reports the inline
+  `background-image` as `"initial"` rather than `"none"`, which turned the mark's
+  layer list into an invalid declaration that the browser dropped whole. Gradient
+  pills were never affected.
+- **Hovering a pill no longer hides the mark inside it.** The hover brightening
+  applied the pill with the `background` shorthand, and a shorthand resets every
+  longhand it does not mention — `background-image` included, which is the layer
+  the mark rides on. Those rows now rebuild the stack layer by layer, so the plate
+  brightens with the glyph still on it.
+
 ## [2.5.0] - 2026-10-15
 
 ### Changed

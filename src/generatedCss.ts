@@ -86,7 +86,24 @@ export function buildCss(): string {
     `${hoverRow}.fc-hover-bg:hover {\n\tbackground-color: var(--fc-bg-hover) !important;\n}\n` +
     // `background`, not `background-color`: a pill fill may be a baked gradient
     // string, and its hover variant is one too — the shorthand takes both.
-    `${hoverRow}.fc-hover-pill:hover .label-name {\n\tbackground: var(--fc-pill-hover) !important;\n}\n`;
+    //
+    // But a shorthand also *resets* every longhand it does not mention, and on a
+    // pill that encloses a mark one of those is `background-image` — the layer the
+    // mark rides on. With `!important` outranking the painter's inline declaration,
+    // hovering such a row wiped the glyph (EM-117). So those rows are carved out
+    // here and served by the rule below, which restates the stack by longhand.
+    `${hoverRow}.fc-hover-pill:not(.fc-hover-mark):hover .label-name {\n\tbackground: var(--fc-pill-hover) !important;\n}\n` +
+    // The same brightening, rebuilt layer by layer so the mark survives it. The
+    // fill arrives split — `--fc-pill-hover-bg` when it is a flat colour,
+    // `--fc-pill-hover-img` when it is a gradient — because only one of the two
+    // can be true of a given pill, and a longhand cannot take both.
+    `${hoverRow}.fc-hover-pill.fc-hover-mark:hover .label-name {\n` +
+    '\tbackground-color: var(--fc-pill-hover-bg, transparent) !important;\n' +
+    '\tbackground-image: var(--fc-mark-img), var(--fc-pill-hover-img, none) !important;\n' +
+    '\tbackground-size: var(--fc-mark-size), auto !important;\n' +
+    '\tbackground-position: var(--fc-mark-pos), left top !important;\n' +
+    '\tbackground-repeat: no-repeat, no-repeat !important;\n' +
+    '}\n';
 
   // A selected row whose pill kept its own fill keeps its own label text too
   // (`.fc-pill-own`, set by the painter): the selection text color is picked
@@ -164,7 +181,73 @@ export function buildCss(): string {
     // `gitMarkStyle: "none"` hides the letter and the dot; the filename still lifts.
     `${letter('.fc-git-off')},\n${dot('.fc-git-off')} {\n\tdisplay: none !important;\n}\n`;
 
-  return header + editCss + hoverCss + gitCss +
+  // The label glow (EM-116). `halo`, `aurora` and `underglow` draw the glow in a
+  // `::before`/`::after`, and a pseudo-element is exactly what an inline style
+  // cannot reach — so the shape lives here and the painter publishes the colours
+  // as custom properties, the same division as the git marks above. (`soft` and
+  // `neon` are pure `text-shadow`; the painter writes those straight onto the
+  // label and nothing about them appears in this file.)
+  //
+  // Two details are load-bearing. `isolation: isolate` gives the label its own
+  // stacking context, which is what keeps a `z-index: -1` pseudo-element behind
+  // the text but still above the row's fill. And the mask is what stops the glow
+  // reading as a blurred *ellipse*: `closest-side` alone leaves a visible edge at
+  // the corners of the box, so the plate is faded out on both axes and the two
+  // gradients are intersected. `-webkit-mask-composite: source-in` is the spelling
+  // Electron's Chromium takes; `mask-composite: intersect` is the standard one.
+  //
+  // The padding carries no `!important` on purpose: a pill writes its own padding
+  // inline, which has to win, and `0 2px` is only here to give the glow a little
+  // room when there is no pill.
+  const glowRow = 'body.fc-active .explorer-folders-view .monaco-list-row';
+  const glowLabel = (marker: string): string => `${glowRow}${marker} .label-name`;
+  const plate = [
+    `${glowLabel('.fc-glow-halo')}::before`,
+    `${glowLabel('.fc-glow-aurora')}::before`,
+  ].join(',\n');
+  const fade = 'linear-gradient(to right, transparent, #000 30%, #000 70%, transparent),\n\t\tlinear-gradient(to bottom, transparent, #000 35%, #000 65%, transparent)';
+  const glowCss =
+    '\n/* Label glow: the styles that need a pseudo-element (see setGlow). */\n' +
+    [glowLabel('.fc-glow-halo'), glowLabel('.fc-glow-aurora'), glowLabel('.fc-glow-under')].join(',\n') + ' {\n' +
+    '\tposition: relative;\n' +
+    '\tisolation: isolate;\n' +
+    '\tpadding: 0 2px;\n' +
+    '}\n' +
+    plate + ' {\n' +
+    '\tcontent: "";\n' +
+    '\tposition: absolute;\n' +
+    // 12px past each end of the label, 1px in from its top and bottom: the glow
+    // reaches sideways, where there is room, and never grows the 22px row.
+    '\tinset: 1px -12px;\n' +
+    '\tz-index: -1;\n' +
+    '\tfilter: blur(var(--fc-glow-blur, 3px));\n' +
+    `\t-webkit-mask-image: ${fade};\n` +
+    '\t-webkit-mask-composite: source-in;\n' +
+    `\tmask-image: ${fade};\n` +
+    '\tmask-composite: intersect;\n' +
+    '}\n' +
+    `${glowLabel('.fc-glow-halo')}::before {\n` +
+    '\tbackground: radial-gradient(closest-side, var(--fc-glow-core), var(--fc-glow-fade) 60%, transparent);\n' +
+    '}\n' +
+    `${glowLabel('.fc-glow-aurora')}::before {\n` +
+    '\tbackground: radial-gradient(closest-side at 30% 50%, var(--fc-glow-core), transparent),\n' +
+    '\t\tradial-gradient(closest-side at 70% 50%, var(--fc-glow-second, var(--fc-glow-core)), transparent);\n' +
+    '}\n' +
+    // The bar under the text. No mask needed: a `closest-side` radial already
+    // reaches transparent before the ends, and the bar is too thin to show a corner.
+    `${glowLabel('.fc-glow-under')}::after {\n` +
+    '\tcontent: "";\n' +
+    '\tposition: absolute;\n' +
+    '\tleft: -6%;\n' +
+    '\tright: -6%;\n' +
+    '\tbottom: 2px;\n' +
+    '\theight: 5px;\n' +
+    '\tz-index: -1;\n' +
+    '\tbackground: radial-gradient(closest-side, var(--fc-glow-core), transparent);\n' +
+    '\tfilter: blur(var(--fc-glow-blur, 2px));\n' +
+    '}\n';
+
+  return header + editCss + hoverCss + gitCss + glowCss +
     '\n/* Selected-row label + twistie. */\n' +
     selectors('.fc-sel-bold') + ' {\n\tfont-weight: bold !important;\n}\n' +
     selectors('.fc-sel-text') + ' {\n\tcolor: var(--fc-sel-fg) !important;\n}\n' +

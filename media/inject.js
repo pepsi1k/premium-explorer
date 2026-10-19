@@ -285,6 +285,30 @@
 		return c[0] + "px " + c[1] + "px " + c[2] + "px " + c[3] + "px";
 	}
 
+	// Shift one row's label block left by `lead`, so the pill's left inset costs the
+	// text no horizontal position (EM-118).
+	//
+	// The plate cannot simply bleed outwards: `.monaco-icon-label-container`,
+	// `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and
+	// all begin at the label's own left edge, so anything drawn left of it is
+	// clipped flat. What *is* available is moving `.monaco-tl-contents` itself —
+	// its parent `.monaco-tl-row` is the first ancestor that does not clip — so the
+	// inset gets drawn in the space the shift opens and the text lands exactly where
+	// an unpilled row's text lands.
+	//
+	// `lead` is baked (`part.pillLead`), never derived here: it is the pill's own
+	// left padding under `pillAlign: "shift"` and 0 under `"hug"`. Nothing is
+	// clamped — how far the plate reaches is the padding's job, and a left padding
+	// big enough to reach the row's chevron will cover it. Tracked like every other
+	// write we own.
+	function setLabelLead(row, lead) {
+		var key = lead ? String(lead) : "";
+		if ((row.dataset.fcLead || "") === key) { return; }
+		row.dataset.fcLead = key;
+		var contents = row.querySelector(".monaco-tl-contents");
+		if (contents) { contents.style.marginLeft = lead ? -lead + "px" : ""; }
+	}
+
 	// The corners one *row* shows. The edge bar is a background image and an image
 	// cannot carry a radius, so `edgeRadius` rounds the two corners the bar actually
 	// occupies — the left pair — and takes whichever of the two radii is larger
@@ -394,16 +418,34 @@
 	// own `:hover` swaps a custom property for free, so the painter only has to say
 	// what the brighter color *is*; the classes keep the rules off rows we never
 	// painted, exactly like `.fc-sel-text`.
-	function setHoverVars(row, bg, pill) {
-		var key = bg + "|" + pill;
+	function setHoverVars(row, bg, pill, mark) {
+		// A pill that encloses a mark cannot take the plain hover rule: that one
+		// applies the fill with the `background` shorthand, and a shorthand resets
+		// every longhand it does not mention — `background-image` among them, which
+		// is the layer the mark rides on. So the whole stack is restated instead,
+		// which means the fill has to travel split into its colour and its image
+		// (a baked pill fill is one or the other) with the mark on top (EM-117).
+		var marked = !!(pill && mark);
+		var key = bg + "|" + pill + "|" + (marked ? mark.key + ":" + mark.size + ":" + mark.trail : "");
 		if ((row.dataset.fcHover || "") === key) { return; }
 		row.dataset.fcHover = key;
 		row.classList.toggle("fc-hover-bg", !!bg);
 		row.classList.toggle("fc-hover-pill", !!pill);
-		if (bg) { row.style.setProperty("--fc-bg-hover", bg); }
-		else { row.style.removeProperty("--fc-bg-hover"); }
-		if (pill) { row.style.setProperty("--fc-pill-hover", pill); }
-		else { row.style.removeProperty("--fc-pill-hover"); }
+		row.classList.toggle("fc-hover-mark", marked);
+		var isImage = marked && pill.indexOf("gradient(") !== -1;
+		var vars = {
+			"--fc-bg-hover": bg,
+			"--fc-pill-hover": pill,
+			"--fc-pill-hover-bg": marked && !isImage ? pill : "",
+			"--fc-pill-hover-img": marked && isImage ? pill : "",
+			"--fc-mark-img": marked ? mark.image : "",
+			"--fc-mark-size": marked ? mark.size + "px " + mark.size + "px" : "",
+			"--fc-mark-pos": marked ? "right " + mark.trail + "px center" : ""
+		};
+		for (var name in vars) {
+			if (vars[name]) { row.style.setProperty(name, vars[name]); }
+			else { row.style.removeProperty(name); }
+		}
 	}
 
 	// A short identity for one baked watermark + tint, so change tracking never has
@@ -482,14 +524,19 @@
 			s.background = value;
 			if (value && mark) {
 				// `background` above has just set the pill; whatever image it left (a
-				// gradient fill) has to stay underneath the mark.
+				// gradient fill) has to stay underneath the mark. A flat pill leaves
+				// no image, but Chromium serializes that as "initial" rather than
+				// "none" — carrying it into the layer list yields `url(...), initial`,
+				// which is invalid, so the whole declaration is dropped and the mark
+				// never paints. Normalize every no-image spelling to "" first.
 				var under = s.backgroundImage;
-				s.backgroundImage = under && under !== "none" ? mark.image + ", " + under : mark.image;
+				if (!under || under === "none" || under === "initial") { under = ""; }
+				s.backgroundImage = under ? mark.image + ", " + under : mark.image;
 				var size = mark.size + "px " + mark.size + "px";
-				s.backgroundSize = under && under !== "none" ? size + ", auto" : size;
+				s.backgroundSize = under ? size + ", auto" : size;
 				var at = "right " + mark.trail + "px center";
-				s.backgroundPosition = under && under !== "none" ? at + ", left top" : at;
-				s.backgroundRepeat = under && under !== "none" ? "no-repeat, no-repeat" : "no-repeat";
+				s.backgroundPosition = under ? at + ", left top" : at;
+				s.backgroundRepeat = under ? "no-repeat, no-repeat" : "no-repeat";
 			}
 			s.borderRadius = value ? radius : "";
 			s.padding = value ? padding : "";
@@ -508,6 +555,48 @@
 			s.setProperty("--fc-ts-key", key);
 			s.fontWeight = weight;
 			s.fontStyle = style;
+		}
+	}
+
+	// The label glow (EM-116). It lands in two places because CSS allows nothing
+	// else: `soft` and `neon` are a plain `text-shadow`, which goes inline on the
+	// label like the weight above, while `halo`, `aurora` and `underglow` draw in a
+	// `::before`/`::after` — and no inline style can reach a pseudo-element. Those
+	// get a class plus the colours as custom properties, and the shape comes from
+	// the generated stylesheet, exactly as the git marks do.
+	//
+	// The two halves are tracked separately for the same reason setTextStyle keys
+	// off the label rather than the row: the list recycles both, and a row whose
+	// glow is unchanged may still have been handed a fresh `.label-name`.
+	// `glow` is null on a row we paint no glow on, which removes every trace.
+	function setGlow(row, glow) {
+		var style = glow ? glow.style : "";
+		var key = style
+			? style + "|" + glow.core + "|" + glow.fade + "|" + glow.second + "|" + glow.spread
+			: "";
+		if ((row.dataset.fcGlow || "") !== key) {
+			row.dataset.fcGlow = key;
+			row.classList.toggle("fc-glow-halo", style === "halo");
+			row.classList.toggle("fc-glow-aurora", style === "aurora");
+			row.classList.toggle("fc-glow-under", style === "underglow");
+			var vars = {
+				"--fc-glow-core": style ? glow.core : "",
+				"--fc-glow-fade": style ? glow.fade : "",
+				"--fc-glow-second": style ? glow.second : "",
+				"--fc-glow-blur": style && glow.spread ? glow.spread + "px" : ""
+			};
+			for (var name in vars) {
+				if (vars[name]) { row.style.setProperty(name, vars[name]); }
+				else { row.style.removeProperty(name); }
+			}
+		}
+		var shadow = style ? glow.shadow : "";
+		var names = row.querySelectorAll(".label-name");
+		for (var i = 0; i < names.length; i++) {
+			var s = names[i].style;
+			if (s.getPropertyValue("--fc-glow-key") === shadow) { continue; }
+			s.setProperty("--fc-glow-key", shadow);
+			s.textShadow = shadow;
 		}
 	}
 
@@ -1065,6 +1154,7 @@
 			var labelBg = "";      // pill behind the label text
 			var labelRadius = "";  // pill corner radii, as a ready border-radius value
 			var labelPadding = ""; // ...and its padding, likewise ready to apply
+			var labelLead = 0;     // ...and how far the row shifts to pay for that padding
 			var corners = "";      // the row's own corner rounding
 			var textColor = part ? part.text : "";
 			var bold = part ? part.bold : false;
@@ -1163,7 +1253,11 @@
 				if (part.pill.value) {
 					labelBg = taken("pills") ? selFill : part.pill.value;
 					labelRadius = cornersCss(part.pillRadius);
+					// The bake already reconciled the two: `pillPadding`'s left value and
+					// `pillLead` are the same number under `shift` and both zero under
+					// `hug`, which is what keeps the text from moving either way.
 					labelPadding = cornersCss(part.pillPadding);
+					labelLead = part.pillLead || 0;
 					// A pill the selection didn't take over keeps its own fill, so trace its
 					// edge: an `invert` highlight paints the row in the same color as the
 					// pill and would otherwise swallow it whole.
@@ -1389,12 +1483,9 @@
 			setSelLabel(row, selLabel, !!selFill && !!SEL.bold);
 			setPillOwn(row, pillOwnFg);
 			setEditVars(row, editFill, SEL.renameStyle === "field");
-			setHoverVars(row, bgHover, pillHover);
-			setBg(row, background);
-			setRadius(row, corners);
-			setBgImage(row, layers);
 			// The enclosed mark, if there is one: anchored `trail` px in from the pill's
 			// right edge, which is the space the bake reserved for it beyond the glyph.
+			// Computed before the hover vars because hover has to preserve it (EM-117).
 			var pillMark = part && part.mark.image && part.mark.inset && !editing
 				? {
 					image: part.mark.image,
@@ -1403,10 +1494,18 @@
 					trail: Math.max(0, part.mark.inset - part.mark.gap - part.mark.size)
 				}
 				: null;
+			setHoverVars(row, bgHover, pillHover, pillMark);
+			setBg(row, background);
+			setRadius(row, corners);
+			setBgImage(row, layers);
 			setLabelBg(row, labelBg, labelRadius, labelPadding, labelOutline, pillMark);
+			setLabelLead(row, labelBg ? labelLead : 0);
 			setOutline(row, outline);
 			setText(row, textColor);
 			setTextStyle(row, bold ? "bold" : "", italic ? "italic" : "");
+			// The glow stands down while a row is being renamed: the rename box sits
+			// where the label was, and a halo around the field reads as a focus ring.
+			setGlow(row, part && !editing && part.glow && part.glow.style ? part.glow : null);
 		}
 	}
 

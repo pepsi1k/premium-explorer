@@ -180,6 +180,13 @@ export interface PartConfig {
    */
   markInPill: boolean;
   /**
+   * How the pill's plate is placed around the label (EM-118). Both settings keep
+   * the **text** lined up with every unpilled row at the same depth — they differ
+   * only in where the plate goes, because a plate can never reach left of the
+   * label on its own (three `overflow: hidden` ancestors begin exactly there).
+   */
+  pillAlign: PillAlign;
+  /**
    * Corner radius for the row fill. Applied as a `border-radius` on the row, which
    * clips *every* background layer at once — fill, edge bar and watermark — so it
    * rounds the whole painted plate. `radiusScale` decides whether that is the row
@@ -212,6 +219,38 @@ export interface PartConfig {
   markSize: number;
   /** Gap in px between the end of the row's text and the mark. */
   markGap: number;
+  /**
+   * The glow behind the row's label (EM-116) — a soft blurred halo around the
+   * text, `off` by default. No `inherit`: a glow is a deliberate per-folder
+   * choice, and the styles are not interchangeable the way a fill colour is.
+   */
+  glowEffect: GlowStyle;
+  /**
+   * Colours for the glow. Empty derives them from the folder's own sequence,
+   * exactly as the edge bar derives its stripes, so a glow set globally still
+   * gives every folder its own. `aurora` is the only style that reads a second
+   * colour; the rest take the first and ignore the others.
+   */
+  glowColors: string[];
+  /**
+   * 0..100 — scales the alpha of every stop the chosen style draws. 100 is the
+   * approved design (see the canvas on EM-116); lower fades the whole glow
+   * without changing its shape.
+   */
+  glowIntensity: number;
+  /**
+   * Blur radius in px. Clamped to {@link GLOW_MAX_SPREAD} so the glow stays
+   * inside the 22px row instead of bleeding into its neighbours, and it scales
+   * the `soft`/`neon` shadow radii in the same proportion.
+   */
+  glowSpread: number;
+  /**
+   * Also light the **label text itself**, on top of whatever `glowEffect` draws.
+   * Off by default: `halo`, `aurora` and `underglow` put their light *behind* the
+   * text and leave the glyphs alone, which is what the approved design shows, so
+   * this only ever adds. `soft` and `neon` already are a text glow and ignore it.
+   */
+  glowText: boolean;
   /** The tiled watermark behind the row. */
   watermarkStyle: LayerStyle;
   /** Hex tint, or `"original"` to keep an SVG's own colors. */
@@ -265,6 +304,43 @@ export interface PartConfig {
  */
 export type WatermarkDimStyle = 'smart' | 'text' | 'radius';
 
+/**
+ * Where a pill's plate sits relative to its label (EM-118).
+ *   `shift` — the row's label block is moved left by {@link PartConfig.pillPadding}'s
+ *             left value, so the plate keeps that inset and the text still lands
+ *             where an unpilled row's text lands. The padding is what decides how
+ *             far left the plate reaches.
+ *   `hug`   — no shift and no left inset: the plate starts at the first glyph.
+ */
+export type PillAlign = 'shift' | 'hug';
+
+const PILL_ALIGNS: readonly string[] = ['shift', 'hug'];
+
+function parsePillAlign(raw: unknown): PillAlign | undefined {
+  return typeof raw === 'string' && PILL_ALIGNS.includes(raw) ? raw as PillAlign : undefined;
+}
+
+/**
+ * How the label glow is drawn (EM-116). Three of them draw in a pseudo-element
+ * and so need the generated stylesheet; `soft` and `neon` are pure `text-shadow`,
+ * which an inline style can set on its own.
+ *   `halo`      — a blurred plate behind the text, masked so no box edge shows.
+ *   `soft`      — two soft text-shadow rings in the glow colour.
+ *   `neon`      — three tighter rings, light to dark, for a tube-light look.
+ *   `aurora`    — the `halo` plate with two colours, lobed left and right.
+ *   `underglow` — a thin blurred bar under the text rather than behind it.
+ */
+export type GlowStyle = 'off' | 'halo' | 'soft' | 'neon' | 'aurora' | 'underglow';
+
+/** The spread beyond which a glow starts bleeding out of a 22px row. */
+export const GLOW_MAX_SPREAD = 4;
+
+const GLOW_STYLES: readonly string[] = ['off', 'halo', 'soft', 'neon', 'aurora', 'underglow'];
+
+function parseGlowStyle(raw: unknown): GlowStyle | undefined {
+  return typeof raw === 'string' && GLOW_STYLES.includes(raw) ? raw as GlowStyle : undefined;
+}
+
 const WATERMARK_LAYOUTS: readonly string[] = ['scatter', 'right-edge', 'row', 'corner'];
 function parseWatermarkLayout(value: unknown): WatermarkLayout | undefined {
   return typeof value === 'string' && WATERMARK_LAYOUTS.includes(value) ? value as WatermarkLayout : undefined;
@@ -279,17 +355,19 @@ function parseDimStyle(raw: unknown): WatermarkDimStyle | undefined {
 const ROOT_DEFAULTS: PartConfig = {
   backgroundStyle: 'solid', backgroundFillScale: 'auto', backgroundOpacity: 0.5,
   edge: 'none', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'none', pillOpacity: 1, pillRadius: 6, pillPadding: 5, markInPill: false, backgroundRadius: 0, edgeRadius: 0,
+  pill: 'none', pillOpacity: 1, pillRadius: 6, pillPadding: 5, markInPill: false, pillAlign: 'shift', backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
   markSize: 14, markGap: 6,
+  glowEffect: 'off', glowColors: [], glowIntensity: 100, glowSpread: 3, glowText: false,
   watermarkStyle: 'none', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkLayout: 'scatter', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };
 const INNER_DEFAULTS: PartConfig = {
   backgroundStyle: 'inherit', backgroundFillScale: 'auto', backgroundOpacity: 0.15,
   edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'inherit', pillOpacity: 1, pillRadius: 3, pillPadding: 5, markInPill: false, backgroundRadius: 0, edgeRadius: 0,
+  pill: 'inherit', pillOpacity: 1, pillRadius: 3, pillPadding: 5, markInPill: false, pillAlign: 'shift', backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
   markSize: 14, markGap: 6,
+  glowEffect: 'off', glowColors: [], glowIntensity: 100, glowSpread: 3, glowText: false,
   watermarkStyle: 'inherit', watermarkContrast: 0.15, watermarkDim: 0.7, watermarkDimStyle: 'smart', watermarkLayout: 'scatter', watermarkDimWidth: 260, watermarkDimHeight: 560, watermarkOpacity: 0.3, watermarkSize: 24, watermarkCanvas: 512, watermarkDensity: 4, watermarkVariation: 0.4, watermarkRotation: 40,
 };
 
@@ -533,6 +611,7 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
     pillRadius: parseRadius(get(`${prefix}PillRadius`)) ?? defaults.pillRadius,
     pillPadding: parseRadius(get(`${prefix}PillPadding`)) ?? defaults.pillPadding,
     markInPill: get(`${prefix}MarkInPill`) === true,
+    pillAlign: parsePillAlign(get(`${prefix}PillAlign`)) ?? defaults.pillAlign,
     backgroundRadius: parseRadius(get(`${prefix}BackgroundRadius`)) ?? defaults.backgroundRadius,
     edgeRadius: parseRadius(get(`${prefix}EdgeRadius`)) ?? defaults.edgeRadius,
     textStyle: parseTextStyle(get(`${prefix}TextStyle`)) ?? defaults.textStyle,
@@ -541,6 +620,11 @@ function readPart(get: (key: string) => unknown, prefix: 'root' | 'inner', defau
     markColor: hexOrUndefined(get(`${prefix}MarkColor`)),
     markSize: numberOrUndefined(get(`${prefix}MarkSize`)) ?? defaults.markSize,
     markGap: numberOrUndefined(get(`${prefix}MarkGap`)) ?? defaults.markGap,
+    glowEffect: parseGlowStyle(get(`${prefix}GlowEffect`)) ?? defaults.glowEffect,
+    glowColors: hexArray(get(`${prefix}GlowColors`)),
+    glowIntensity: numberOrUndefined(get(`${prefix}GlowIntensity`)) ?? defaults.glowIntensity,
+    glowSpread: numberOrUndefined(get(`${prefix}GlowSpread`)) ?? defaults.glowSpread,
+    glowText: get(`${prefix}GlowText`) === true,
     watermarkStyle: parseLayerStyle(get(`${prefix}WatermarkStyle`)) ?? defaults.watermarkStyle,
     watermarkColor: watermarkColorOrUndefined(get(`${prefix}WatermarkColor`)),
     watermarkContrast: numberOrUndefined(get(`${prefix}WatermarkContrast`)) ?? defaults.watermarkContrast,
@@ -628,6 +712,8 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   const pillPadding = parseRadius(entry[`${prefix}PillPadding`]);
   if (pillPadding !== undefined) { o.pillPadding = pillPadding; }
   if (entry[`${prefix}MarkInPill`] === true) { o.markInPill = true; }
+  const pillAlign = parsePillAlign(entry[`${prefix}PillAlign`]);
+  if (pillAlign) { o.pillAlign = pillAlign; }
   const backgroundRadius = parseRadius(entry[`${prefix}BackgroundRadius`]);
   if (backgroundRadius !== undefined) { o.backgroundRadius = backgroundRadius; }
   const edgeRadius = parseRadius(entry[`${prefix}EdgeRadius`]);
@@ -644,6 +730,15 @@ function readPartOverride(entry: PartInput, prefix: 'root' | 'inner'): Partial<P
   if (markSize !== undefined) { o.markSize = markSize; }
   const markGap = numberOrUndefined(entry[`${prefix}MarkGap`]);
   if (markGap !== undefined) { o.markGap = markGap; }
+  const glowEffect = parseGlowStyle(entry[`${prefix}GlowEffect`]);
+  if (glowEffect) { o.glowEffect = glowEffect; }
+  const glowColors = hexArray(entry[`${prefix}GlowColors`]);
+  if (glowColors.length) { o.glowColors = glowColors; }
+  const glowIntensity = numberOrUndefined(entry[`${prefix}GlowIntensity`]);
+  if (glowIntensity !== undefined) { o.glowIntensity = glowIntensity; }
+  const glowSpread = numberOrUndefined(entry[`${prefix}GlowSpread`]);
+  if (glowSpread !== undefined) { o.glowSpread = glowSpread; }
+  if (entry[`${prefix}GlowText`] === true) { o.glowText = true; }
   return Object.keys(o).length ? o : undefined;
 }
 

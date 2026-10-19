@@ -332,6 +332,33 @@
       }
     },
     {
+      "path": "./pills/align-shift",
+      "rootPill": "solid",
+      "rootPillColor": "#2f6f4f",
+      "rootPillAlign": "shift",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./pills/align-hug",
+      "rootPill": "solid",
+      "rootPillColor": "#2f6f4f",
+      "rootPillAlign": "hug",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./pills/lead-wide",
+      "rootPill": "solid",
+      "rootPillColor": "#7f4fc9",
+      "rootPillAlign": "shift",
+      "rootPillPadding": [
+        0,
+        12,
+        0,
+        10
+      ],
+      "innerBackgroundStyle": "none"
+    },
+    {
       "path": "./pills/radius-square",
       "rootPill": "solid",
       "rootPillFill": { "stops": [{ "color": "#7c4db4", "alpha": 0.55 }] },
@@ -703,6 +730,74 @@
       "path": "./symlink/target",
       "rootBackgroundColor": "#c99700",
       "rootBackgroundOpacity": 0.55,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/halo",
+      "rootGlowEffect": "halo",
+      "rootGlowColors": [
+        "#f0b450"
+      ],
+      "rootTextColor": "#fff4e0",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/soft",
+      "rootGlowEffect": "soft",
+      "rootGlowColors": [
+        "#f0b450"
+      ],
+      "rootTextColor": "#fff4e0",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/neon",
+      "rootGlowEffect": "neon",
+      "rootGlowColors": [
+        "#1d9e75"
+      ],
+      "rootTextColor": "#e9fff7",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/aurora",
+      "rootGlowEffect": "aurora",
+      "rootGlowColors": [
+        "#7f77dd",
+        "#5dcaa5"
+      ],
+      "rootTextColor": "#ffffff",
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/inner-glow",
+      "rootGlowEffect": "halo",
+      "rootGlowColors": [
+        "#f0b450"
+      ],
+      "innerGlowEffect": "soft",
+      "innerGlowColors": [
+        "#5dcaa5"
+      ],
+      "innerGlowIntensity": 70,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/text-glow",
+      "rootGlowEffect": "halo",
+      "rootGlowColors": [
+        "#f0b450"
+      ],
+      "rootGlowText": true,
+      "innerBackgroundStyle": "none"
+    },
+    {
+      "path": "./glow/underglow",
+      "rootGlowEffect": "underglow",
+      "rootGlowColors": [
+        "#f0b450"
+      ],
+      "rootTextColor": "#fff4e0",
       "innerBackgroundStyle": "none"
     },
     {

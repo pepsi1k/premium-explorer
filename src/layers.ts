@@ -9,8 +9,8 @@
  * and reuses it wholesale, falling back to the shipped default when nothing
  * encloses the folder (see NO_ANCESTOR_FALLBACK).
  */
-import { Fill, Radius, WatermarkArt, fillDirectionOf, fillHasVertical, isSquare, markDataUri, resolveFill, resolvePadding, resolveRadius, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
-import { WATERMARK_COLOR_ORIGINAL, FillScale, LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig, RadiusScale } from './config';
+import { Fill, Radius, WatermarkArt, fillDirectionOf, fillHasVertical, isSquare, markDataUri, mixHex, resolveFill, resolvePadding, resolveRadius, watermarkPatternDataUri, hexToRgba, lightenHex, stripeGradient } from './colors';
+import { GLOW_MAX_SPREAD, GlowStyle, WATERMARK_COLOR_ORIGINAL, FillScale, LayerStyle, NO_ANCESTOR_FALLBACK, PartConfig, RadiusScale } from './config';
 
 /** A colored folder: its base color, its source path, and its resolved root/inner layers. */
 export interface ColoredFolder {
@@ -118,6 +118,102 @@ export interface WatermarkLayer {
 }
 
 /**
+ * The baked glow (EM-116). It is the one layer that lands in two different places,
+ * because CSS decides where it can land: `soft` and `neon` are nothing but a
+ * `text-shadow`, which an inline style sets directly on the label, while `halo`,
+ * `aurora` and `underglow` draw in a `::before`/`::after` — a pseudo-element no
+ * inline style can reach — so those travel as a class plus the colours as custom
+ * properties, exactly like the git marks (see generatedCss.ts). Empty `style` = off.
+ */
+export interface GlowLayer {
+  /** `""` when the glow is off; otherwise the style that was asked for. */
+  style: GlowStyle | '';
+  /** The finished `text-shadow` value for `soft`/`neon`; `""` for the rest. */
+  shadow: string;
+  /** The gradient's strong stop (`--fc-glow-core`), for the pseudo-element styles. */
+  core: string;
+  /** `halo`'s faded 60% stop (`--fc-glow-fade`); `""` where the style has none. */
+  fade: string;
+  /** `aurora`'s second lobe (`--fc-glow-second`); `""` for every other style. */
+  second: string;
+  /** The blur radius in px, already clamped (`--fc-glow-blur`). */
+  spread: number;
+}
+
+/** The empty glow — what every style resolves to when it is off or has no colour. */
+const NO_GLOW: GlowLayer = { style: '', shadow: '', core: '', fade: '', second: '', spread: 0 };
+
+/**
+ * The spread the approved design was drawn at. Every radius below is expressed as
+ * the design's own px value scaled by `spread / GLOW_DESIGN_SPREAD`, so the default
+ * reproduces the canvas exactly and a different spread scales the whole glow
+ * rather than just its outer edge.
+ */
+const GLOW_DESIGN_SPREAD = 3;
+
+/** How far `neon`'s inner and outer rings are lightened/darkened off the base colour. */
+const NEON_STEP = 0.35;
+
+/**
+ * Bake the glow. Colour precedence matches the edge bar's: an explicit
+ * `glowColors` list, else the folder's auto-derived sequence — so one global
+ * `glowEffect` still gives every folder a glow of its own. No `inherit`: a nested
+ * rule does not pick up an enclosing folder's glow, for the same reason it does
+ * not pick up its mark.
+ */
+export function buildGlow(p: PartConfig, sequence: string[]): GlowLayer {
+  if (p.glowEffect === 'off') {
+    return NO_GLOW;
+  }
+  const colors = p.glowColors.length ? p.glowColors : sequence;
+  if (!colors.length) {
+    // A manual rule derives no sequence, so without an explicit `glowColors`
+    // there is no colour to glow in — paint nothing rather than a stand-in.
+    return NO_GLOW;
+  }
+  // `glowIntensity` scales every stop's alpha together; 100 is the design.
+  const k = Math.max(0, Math.min(100, p.glowIntensity)) / 100;
+  const spread = Math.max(1, Math.min(GLOW_MAX_SPREAD, Math.round(p.glowSpread)));
+  const px = (design: number): number => Math.max(1, Math.round(design * spread / GLOW_DESIGN_SPREAD));
+  const hex = colors[0];
+  // `glowText` lights the glyphs as well. The plate styles leave the text alone by
+  // design, so this is purely additive — and the two text-only styles already *are*
+  // the text glow, which is why they never consult it.
+  const textGlow = p.glowText ? `0 0 ${px(3)}px ${hexToRgba(hex, 0.9 * k)}, 0 0 ${px(7)}px ${hexToRgba(hex, 0.55 * k)}` : '';
+  if (p.glowEffect === 'soft') {
+    return {
+      ...NO_GLOW,
+      style: 'soft',
+      shadow: `0 0 ${px(3)}px ${hexToRgba(hex, 0.9 * k)}, 0 0 ${px(7)}px ${hexToRgba(hex, 0.55 * k)}`,
+    };
+  }
+  if (p.glowEffect === 'neon') {
+    // Three rings stepping light -> base -> dark is what reads as a lit tube. The
+    // label's own colour is left alone: the design pairs `neon` with a near-white
+    // `textColor`, but that is the user's setting to make, not ours to force.
+    const light = lightenHex(hex, NEON_STEP);
+    const dark = mixHex(hex, '#000000', NEON_STEP);
+    return {
+      ...NO_GLOW,
+      style: 'neon',
+      shadow: `0 0 ${px(2)}px ${hexToRgba(light, k)}, 0 0 ${px(5)}px ${hexToRgba(hex, k)}, 0 0 ${px(9)}px ${hexToRgba(dark, k)}`,
+    };
+  }
+  if (p.glowEffect === 'underglow') {
+    // The bar fades to transparent on its own (`closest-side`), so it needs no
+    // second stop and no mask — and a blur a step under the plate styles', which
+    // is what keeps a 5px bar from washing into the row below.
+    return { ...NO_GLOW, style: 'underglow', shadow: textGlow, core: hexToRgba(hex, 0.85 * k), spread: Math.max(1, spread - 1) };
+  }
+  if (p.glowEffect === 'aurora') {
+    // Two lobes, so the second colour is the one that makes this style what it is;
+    // with only one colour available both lobes take it and it reads as `halo`.
+    return { ...NO_GLOW, style: 'aurora', shadow: textGlow, core: hexToRgba(hex, 0.7 * k), second: hexToRgba(colors[1] ?? hex, 0.7 * k), spread };
+  }
+  return { ...NO_GLOW, style: 'halo', shadow: textGlow, core: hexToRgba(hex, 0.7 * k), fade: hexToRgba(hex, 0.25 * k), spread };
+}
+
+/**
  * The baked, ready-to-apply colors for one row kind (the root row, or the inner
  * rows). Every layer is independent, so background/edge/pill/text may all be set.
  */
@@ -132,6 +228,13 @@ export interface Part {
   pillRadius: number[];
   /** Pill padding in px, CSS order (top, right, bottom, left). */
   pillPadding: number[];
+  /**
+   * How far left the painter shifts the row's label block to pay for the pill's
+   * left inset, so the plate reaches left without moving the text (EM-118). Equal
+   * to `pillPadding`'s left value under `pillAlign: "shift"`, and 0 under `"hug"`,
+   * where that inset is dropped instead.
+   */
+  pillLead: number;
   /** Row-fill corner radii in px, same order. All zero = square (the default). */
   backgroundRadius: number[];
   /** Edge-bar corner radii in px, same order; only the left pair can show. */
@@ -142,6 +245,8 @@ export interface Part {
   italic: boolean;
   /** One fixed glyph stamped after the row's label. */
   mark: MarkLayer;
+  /** The soft glow around the row's label. */
+  glow: GlowLayer;
   /** Faint tiled artwork behind the row. */
   watermark: WatermarkLayer;
   /** The folder's opaque base color — used by the `invert` selection highlight. */
@@ -361,6 +466,11 @@ export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Par
   const inset = markInset(p, !!(markArt && markArt.content), !!pill.value);
   const pillPadding = resolvePadding(p.pillPadding);
   pillPadding[1] += inset;
+  // `hug` drops the left inset outright; `shift` keeps it and hands the painter the
+  // same number to move the row by, which is what makes the text land unmoved. The
+  // choice is resolved here rather than in the browser: the painter only picks.
+  const pillLead = p.pillAlign === 'hug' ? 0 : pillPadding[3];
+  if (p.pillAlign === 'hug') { pillPadding[3] = 0; }
   return {
     background: buildLayer(p.backgroundStyle, p.backgroundColor, p.backgroundOpacity, baseHex, inheritFrom?.background, NO_ANCESTOR_FALLBACK.background, p.backgroundFill, p.backgroundFillScale),
     edge: buildStripe(p, folder.sequence, inheritFrom?.edge),
@@ -370,12 +480,14 @@ export function buildPart(folder: ColoredFolder, p: PartConfig, inheritFrom: Par
     // radius means it, and square is how "none" is spelt.
     pillRadius: inheritedRadius(p.pill, p.pillRadius, inheritFrom?.pillRadius),
     pillPadding: pillPadding,
+    pillLead,
     backgroundRadius: inheritedRadius(p.backgroundStyle, p.backgroundRadius, inheritFrom?.backgroundRadius),
     edgeRadius: inheritedRadius(p.edge, p.edgeRadius, inheritFrom?.edgeRadius),
     text: p.textColor ?? '',
     bold: p.textStyle === 'bold' || p.textStyle === 'bold-italic',
     italic: p.textStyle === 'italic' || p.textStyle === 'bold-italic',
     mark: buildMark(p, markArt, inset),
+    glow: buildGlow(p, folder.sequence),
     watermark: buildWatermark(p, fillHex, folder.arts, folder.name, inheritFrom?.watermark),
     solid: fillHex,
   };
