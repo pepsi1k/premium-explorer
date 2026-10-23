@@ -4,7 +4,7 @@
   "icon": "assets/logo/png/logo-edge-512.png",
   "displayName": "Premium Explorer",
   "description": "Tell your projects apart at a glance: color-code folders in the Explorer. Git repos get a color automatically, or style any folder yourself.",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -418,13 +418,13 @@
               "rootPillAlign": {
                 "type": "string",
                 "enum": [
-                  "shift",
-                  "hug"
+                  "hug",
+                  "shift"
                 ],
-                "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+                "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.\n\n`hug` is the default because it leaves the gap between a row's **chevron** and its content identical whether the row carries a pill or not. `shift` moves the plate that much closer to the chevron than an unpilled row's text sits (EM-120).",
                 "enumDescriptions": [
-                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
-                  "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+                  "The plate starts at the first glyph. The left padding is dropped; the right one still applies.",
+                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly."
                 ]
               },
               "rootBackgroundRadius": {
@@ -916,13 +916,13 @@
               "innerPillAlign": {
                 "type": "string",
                 "enum": [
-                  "shift",
-                  "hug"
+                  "hug",
+                  "shift"
                 ],
-                "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+                "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.\n\n`hug` is the default because it leaves the gap between a row's **chevron** and its content identical whether the row carries a pill or not. `shift` moves the plate that much closer to the chevron than an unpilled row's text sits (EM-120).",
                 "enumDescriptions": [
-                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
-                  "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+                  "The plate starts at the first glyph. The left padding is dropped; the right one still applies.",
+                  "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly."
                 ]
               },
               "innerBackgroundRadius": {
@@ -1801,15 +1801,15 @@
         "premiumExplorer.rootPillAlign": {
           "type": "string",
           "enum": [
-            "shift",
-            "hug"
+            "hug",
+            "shift"
           ],
-          "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+          "markdownDescription": "Where the repo root row's pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.rootPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.\n\n`hug` is the default because it leaves the gap between a row's **chevron** and its content identical whether the row carries a pill or not. `shift` moves the plate that much closer to the chevron than an unpilled row's text sits (EM-120).",
           "enumDescriptions": [
-            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
-            "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+            "The plate starts at the first glyph. The left padding is dropped; the right one still applies.",
+            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly."
           ],
-          "default": "shift"
+          "default": "hug"
         },
         "premiumExplorer.rootBackgroundRadius": {
           "anyOf": [
@@ -2471,15 +2471,15 @@
         "premiumExplorer.innerPillAlign": {
           "type": "string",
           "enum": [
-            "shift",
-            "hug"
+            "hug",
+            "shift"
           ],
-          "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.",
+          "markdownDescription": "Where the inner rows (files/folders inside)'s pill **plate** sits around the label.\n\nBoth keep the label **text** lined up with the unpilled rows at the same depth — they differ only in where the plate goes. A plate can never reach left of the label on its own: `.monaco-icon-label-container`, `.monaco-icon-label` and `.monaco-tl-contents` are all `overflow: hidden` and all start exactly there, so anything drawn further left is clipped flat.\n\nHow far left `shift` reaches is `#premiumExplorer.innerPillPadding#`'s **left** value — set it per side with the CSS forms, e.g. `[0, 10, 0, 4]` for a 4px lead and 10px of right inset. Nothing is clamped, so a left padding large enough to reach the row's chevron will cover it.\n\n`hug` is the default because it leaves the gap between a row's **chevron** and its content identical whether the row carries a pill or not. `shift` moves the plate that much closer to the chevron than an unpilled row's text sits (EM-120).",
           "enumDescriptions": [
-            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly.",
-            "No lead: the plate starts at the first glyph. The left padding is dropped; the right one still applies."
+            "The plate starts at the first glyph. The left padding is dropped; the right one still applies.",
+            "Move the row's label block left by the pill's left padding, so the plate keeps that inset and wraps the text evenly."
           ],
-          "default": "shift"
+          "default": "hug"
         },
         "premiumExplorer.innerBackgroundRadius": {
           "anyOf": [

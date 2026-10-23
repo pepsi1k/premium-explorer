@@ -306,11 +306,15 @@ export type WatermarkDimStyle = 'smart' | 'text' | 'radius';
 
 /**
  * Where a pill's plate sits relative to its label (EM-118).
+ *   `hug`   — the default. No shift and no left inset: the plate starts at the
+ *             first glyph, which is exactly where an unpilled row's text starts,
+ *             so the gap between a row's chevron and its content is the same
+ *             whether the row carries a pill or not (EM-120).
  *   `shift` — the row's label block is moved left by {@link PartConfig.pillPadding}'s
  *             left value, so the plate keeps that inset and the text still lands
  *             where an unpilled row's text lands. The padding is what decides how
- *             far left the plate reaches.
- *   `hug`   — no shift and no left inset: the plate starts at the first glyph.
+ *             far left the plate reaches — and the plate then sits that much
+ *             closer to the chevron than an unpilled row's text does.
  */
 export type PillAlign = 'shift' | 'hug';
 
@@ -355,7 +359,7 @@ function parseDimStyle(raw: unknown): WatermarkDimStyle | undefined {
 const ROOT_DEFAULTS: PartConfig = {
   backgroundStyle: 'solid', backgroundFillScale: 'auto', backgroundOpacity: 0.5,
   edge: 'none', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'none', pillOpacity: 1, pillRadius: 6, pillPadding: 5, markInPill: false, pillAlign: 'shift', backgroundRadius: 0, edgeRadius: 0,
+  pill: 'none', pillOpacity: 1, pillRadius: 6, pillPadding: 5, markInPill: false, pillAlign: 'hug', backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
   markSize: 14, markGap: 6,
   glowEffect: 'off', glowColors: [], glowIntensity: 100, glowSpread: 3, glowText: false,
@@ -364,7 +368,7 @@ const ROOT_DEFAULTS: PartConfig = {
 const INNER_DEFAULTS: PartConfig = {
   backgroundStyle: 'inherit', backgroundFillScale: 'auto', backgroundOpacity: 0.15,
   edge: 'inherit', edgeOpacity: 1, edgeColors: [], edgeWidth: 3, edgeStripeSize: 6, edgeDirection: 'diagonal-reverse', edgeBlend: 'bands',
-  pill: 'inherit', pillOpacity: 1, pillRadius: 3, pillPadding: 5, markInPill: false, pillAlign: 'shift', backgroundRadius: 0, edgeRadius: 0,
+  pill: 'inherit', pillOpacity: 1, pillRadius: 3, pillPadding: 5, markInPill: false, pillAlign: 'hug', backgroundRadius: 0, edgeRadius: 0,
   textStyle: 'none',
   markSize: 14, markGap: 6,
   glowEffect: 'off', glowColors: [], glowIntensity: 100, glowSpread: 3, glowText: false,

@@ -3,6 +3,22 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.6.1] - 2026-10-23
+
+### Fixed
+- **A pill no longer crowds the folder arrow beside it.** 2.6.0 made a pilled row's
+  plate reach 5px further left than an unpilled row's text starts, so rows carrying
+  a pill sat visibly tighter to their expand arrow than their siblings did — the
+  arrow itself never moved, but the gap beside it stopped matching down the tree.
+  `rootPillAlign`/`innerPillAlign` now default to **`hug`**, which starts the plate
+  exactly where an unpilled row's text starts, so that gap is the same on every row
+  at a depth. The text stays aligned either way, which is what 2.6.0 set out to fix.
+
+  A `hug` pill is asymmetric by design — the left padding is dropped and the right
+  one still applies — so pills are slightly tighter on the left than 2.6.0 drew
+  them. **Set `"premiumExplorer.rootPillAlign": "shift"`** (globally or per rule) to
+  put the leading plate back.
+
 ## [2.6.0] - 2026-10-19
 
 ### Added
