@@ -1618,8 +1618,11 @@
 	// ride inside this script: the workbench references the injected files by a
 	// fixed URL, so Chromium serves them from its cache on a window reload and
 	// only a full app restart re-reads them from disk — settings changes looked
-	// ignored (EM-86). This script and the CSS only change with the extension, so
-	// caching them is fine; the part that changes per settings save is this JSON,
+	// ignored (EM-86). This script and the CSS change only with the extension, so
+	// caching them is fine *provided the URL changes when they do* — it did not,
+	// and an update left the old painter running against new assets until the next
+	// full restart (EM-121); the patch now puts the version in the query for that
+	// reason. The part that changes per settings save is this JSON,
 	// and `cache: "no-store"` makes every reload paint the current settings. The
 	// relative URL resolves against workbench.html, which sits in the same
 	// directory the extension mirrors all three files into; CSP-wise the fetch is

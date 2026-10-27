@@ -3,6 +3,27 @@
 All notable changes to the "premium-explorer" extension are documented here, following
 [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.6.2] - 2026-10-27
+
+### Fixed
+- **An update now actually reaches the workbench.** The tags written into
+  `workbench.html` named the injected script and stylesheet by a fixed URL, and
+  Chromium serves what that URL names from its cache on a window reload — only a
+  full app restart re-read them from disk. Updating the extension refreshed the
+  generated files but never rewrote those tags, so the **previous release's painter
+  kept running against the new release's assets**, and the "Reload to apply" prompt
+  shown right after an update was the very reload that kept the stale copy. Nothing
+  announced it: painting still worked, just with the old code, so every fix shipped
+  since the workbench was first patched could be sitting inert.
+
+  Both URLs now carry the extension's version, which makes each release a URL the
+  cache has never seen, and the patch is re-stamped on the first activation after an
+  update so the version in it is the one that is running. **The first launch of
+  2.6.2 re-applies the patch and offers one reload; after that, loader and payload
+  cannot drift apart again.** If the workbench directory is not writable the
+  re-stamp is skipped silently — painting keeps working, and
+  **Premium Explorer: Enable Background Painting** applies it once access is granted.
+
 ## [2.6.1] - 2026-10-23
 
 ### Fixed

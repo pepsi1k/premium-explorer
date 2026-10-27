@@ -214,11 +214,22 @@ export function apply(workbench: Workbench, version: string, sources: Sources): 
 
   // Into <head>, after the workbench's own stylesheet so ours cascades over it —
   // and so auxiliary windows, which clone the head, are painted too.
+  //
+  // Both URLs carry the extension's version, and that is load-bearing rather than
+  // decorative (EM-121). Chromium caches what these tags name and serves it from
+  // cache on a window reload — only a full app restart re-reads the files from
+  // disk. An update therefore used to leave the *previous* painter running against
+  // freshly baked assets, a pairing nothing is tested against, and the "Reload to
+  // apply" prompt shown right after an update was the very reload that kept the
+  // stale copy. A version in the query makes the new release a URL the cache has
+  // never seen, so the reload loads it. `?v=` keeps the path CSP-wise 'self', which
+  // `script-src` already allows.
+  const tag = encodeURIComponent(version);
   const region = [
     START,
     `<!-- premium-explorer:generated-by ${version} -->`,
-    `<link rel="stylesheet" href="./${CSS_FILE}">`,
-    `<script src="./${JS_FILE}"></script>`,
+    `<link rel="stylesheet" href="./${CSS_FILE}?v=${tag}">`,
+    `<script src="./${JS_FILE}?v=${tag}"></script>`,
     END,
   ].join('\n');
   write(workbench.html, clean.replace('</head>', `${region}\n</head>`));

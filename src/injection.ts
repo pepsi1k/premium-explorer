@@ -69,6 +69,56 @@ export async function enableInjection(
   await offerReload(`Premium Explorer: painting ${files.count} folder(s). Reload to apply.`);
 }
 
+/**
+ * After an extension update, make the patched workbench load *this* version's
+ * painter (EM-121).
+ *
+ * The tags in `workbench.html` name the injected files by URL, and Chromium serves
+ * those from its cache on a window reload — only a full app restart re-reads them
+ * from disk. Refreshing the files alone therefore left the previous release's
+ * painter running against newly baked assets: the loader and the payload were
+ * different versions, a pairing nothing is tested against, and any fix made in the
+ * newer painter was simply not running. The stamp in the HTML is what reveals it,
+ * and re-applying the patch is what fixes it, because `apply()` rewrites the URLs
+ * with the new version in them.
+ *
+ * Returns true when it owned the update — the caller then skips the plain
+ * regenerate, so the user is asked to reload once rather than twice.
+ */
+export async function refreshInjectionIfStale(
+  context: vscode.ExtensionContext,
+  config: FolderColorerConfig,
+): Promise<boolean> {
+  if (!context.globalState.get<boolean>(INJECTION_STATE)) {
+    return false;
+  }
+  const version = String(context.extension?.packageJSON?.version ?? '');
+  const status = inspect();
+  // `unpatched` is restoreInjectionIfLost's case, not this one; `missing` is a
+  // remote or browser host, where there is no workbench on this machine at all.
+  if (!version || status.state !== 'patched' || status.version === version) {
+    return false;
+  }
+  // Nothing to offer if we cannot write: the user would have to re-grant access,
+  // and restoreInjectionIfLost already covers the case where the patch is gone.
+  // Say nothing here — the painting still works, it is just the older one.
+  if (!checkAccess(status.workbench.dir).writable) {
+    return false;
+  }
+
+  const files = await writeBackgroundFiles(context, config);
+  try {
+    apply(status.workbench, version, { css: files.cssUri.fsPath, js: files.jsUri.fsPath, json: files.jsonUri.fsPath });
+  } catch (e) {
+    await reportPatchFailure(e, status.workbench.dir);
+    return true;
+  }
+  await offerReload(
+    `Premium Explorer ${version}: updated the injected painter. Reload to apply.`,
+  );
+  return true;
+}
+
 /** Put `workbench.html` back and remove the files we placed beside it. */
 export async function disableInjection(context: vscode.ExtensionContext): Promise<void> {
   const status = inspect();
